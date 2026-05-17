@@ -1,0 +1,18 @@
+[Unit]
+Description=VerisureSix6 RF Listener
+After=network.target verisure-backend.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=orangepi
+WorkingDirectory=/home/orangepi/verisure
+Environment=PATH=/home/orangepi/verisure/backend/venv/bin
+EnvironmentFile=/home/orangepi/verisure/backend/.env
+ExecStart=/home/orangepi/verisure/backend/venv/bin/python -m rf.listener
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
