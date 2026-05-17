@@ -244,6 +244,25 @@ Esto significa que el mini-USB podría exponer también la interfaz AT del Telit
 - Formato: SIM estándar (no micro/nano)
 - Con servicio cancelado: potencialmente reemplazable con SIM propia para redirigir tráfico
 
+### Test de puerto mini-USB — 17 mayo 2026
+
+Se conectó el hub al Mac via cable mini-USB de datos. Resultados:
+
+1. **El hub respondió físicamente**: sonido de booteo y luces LED en panel frontal (botones Services, correo, alarma, casa+2)
+2. **No fue detectado por el Mac**: no apareció ningún dispositivo nuevo en `ls /dev/tty.*`, `ioreg`, ni `system_profiler`
+3. **Único USB detectado**: solo el receptor 2.4GHz del teclado/mouse
+
+**Investigación web posterior reveló:**
+- El autor de funoverip (Jerome Nokin) reveló en comentarios del blog (2015) que **fue contratado por Verisure y firmó NDA**, por lo que la **Part 3 (USB console authentication) nunca se publicó**
+- Confirmó que el acceso por USB es **read-only** y no permite reconfigurar el Vbox: *"Getting access to the USB console doesn't worth it. It won't let you reconfigure the VBOX. Most of the config is read-only."*
+
+**Posibles causas de que no se detecte:**
+1. El puerto mini-USB del modelo ES6502VSF-ES-M02 (2019) podría **no estar conectado internamente** a diferencia del modelo anterior del research (2014)
+2. Podría requerir **autenticación previa** (como anticipaba el research de funoverip) antes de exponer cualquier interfaz
+3. Podría usar un **protocolo propietario** no-estándar que requiere hardware/driver específico
+
+**Conclusión:** El puerto mini-USB no es una vía práctica para este proyecto. El enfoque correcto es **RF passivo** via RTL-SDR + GNU Radio (Fase 1).
+
 ---
 
 ## 5. Research existente — funoverip
@@ -302,8 +321,8 @@ Con el servicio activo, las keys se capturan del tráfico de red. Con servicio c
 ### Limitación conocida
 El research original no documentó el **stream de video** de las cámaras ES700IPDE. Solo el protocolo de eventos PIR. El video es el componente más incierto del proyecto.
 
-### Part 3 (no publicada)
-El autor mencionó una parte 3 sobre autenticación en la consola local USB. Nunca fue publicada. El puerto mini-USB del hub requiere autenticación basada en las AES keys extraídas del firmware.
+### Part 3 (no publicada — NDA)
+El autor mencionó una parte 3 sobre autenticación en la consola local USB. **Nunca fue publicada**. En comentarios del blog (2015), Jerome Nokin reveló que **fue contratado por Verisure y firmó un acuerdo de confidencialidad (NDA)**, por lo que no pudo publicar la parte 3. Confirmó que el acceso por USB es *read-only* y no permite reconfigurar el Vbox para uso autónomo.
 
 ---
 
@@ -1343,6 +1362,14 @@ El router está diseñado para que cambiar de MVP a producción sea un switch de
 ---
 
 ## Historial de sesiones de trabajo
+
+### Sesión 2 — 17 mayo 2026
+- Instalación de GNU Radio en Mac: `brew install gnuradio`
+- Clonación del repo funoverip como referencia dentro del proyecto
+- Test de puerto mini-USB: hub responde físicamente pero no es detectado por el Mac
+- Research web: descubrimiento de que el autor de funoverip trabaja para Verisure bajo NDA — Part 3 jamás publicada
+- Se documenta que el puerto mini-USB **no es una vía viable** para el proyecto
+- Se define que el enfoque principal es RF passivo (RTL-SDR + GNU Radio) al llegar el hardware (~26 mayo)
 
 ### Sesión 1 — 13 mayo 2026
 - Identificación del hardware disponible
