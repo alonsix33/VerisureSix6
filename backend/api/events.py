@@ -77,14 +77,18 @@ async def create_event(data: EventCreate, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(event)
 
-    decision = await sheriff_service.evaluate_event({
-        "id": event.id,
-        "device_id": event.device_id,
-        "event_type": event.event_type,
-        "zone": event.zone,
-        "alert_level": event.alert_level,
-        "timestamp": event.timestamp.isoformat() if event.timestamp else None,
-    })
+    decision = await sheriff_service.evaluate_event(
+        event={
+            "id": event.id,
+            "device_id": event.device_id,
+            "device_name": event.device_name,
+            "event_type": event.event_type,
+            "zone": event.zone,
+            "alert_level": event.alert_level,
+            "timestamp": event.timestamp.isoformat() if event.timestamp else None,
+        },
+        db=db,
+    )
     if decision.get("alert_level") != "none":
         event.alert_level = decision["alert_level"]
         event.sheriff_evaluated = True

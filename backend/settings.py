@@ -4,6 +4,7 @@ from pydantic import SecretStr
 
 class Settings(BaseSettings):
     anthropic_api_key: SecretStr = SecretStr("")
+    openai_api_key: SecretStr = SecretStr("")
     tapo_email: str = ""
     tapo_password: str = ""
     sheriff_mode: str = "monitor"

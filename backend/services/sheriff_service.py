@@ -1,34 +1,46 @@
 import json
 import logging
+import re
 
 from anthropic import AsyncAnthropic
+from openai import AsyncOpenAI
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.settings import settings
+from backend.services.rag_service import rag_service
 
 logger = logging.getLogger(__name__)
 
-SHERIFF_MODES = ["off", "monitor", "normal", "away", "travel"]
-
-
-def _build_home_context() -> str:
-    return (
-        "Hogar de Alonso en Lima, Perú.\n"
-        "Dispositivos: 2 sensores Verisure ES700IPDE, "
-        "1 cámara Tapo C420 (balcón), 1 hub Tapo H200.\n"
-        "Modo Sheriff configurado."
-    )
+SYSTEM_PROMPT = (
+    "Eres el Sheriff de seguridad del hogar de Alonso en Lima, Perú.\n"
+    "Tu trabajo es analizar eventos de seguridad y decidir si son anómalos.\n"
+    "Responde SOLO en JSON con esta estructura:\n"
+    '{"is_anomalous": bool, "alert_level": "none|low|medium|high|critical", '
+    '"reasoning": "explicación breve", '
+    '"message": "mensaje para Alonso (si aplica)", '
+    '"recommended_action": "descripción"}'
+)
 
 
 class SheriffService:
     def __init__(self):
-        api_key = settings.anthropic_api_key.get_secret_value()
-        self.client = AsyncAnthropic(api_key=api_key) if api_key else None
-        self.model = "claude-sonnet-4-20250514"
+        anthropic_key = settings.anthropic_api_key.get_secret_value()
+        openai_api = settings.openai_api_key.get_secret_value()
 
-    def _is_available(self) -> bool:
-        return self.client is not None
+        self.claude = AsyncAnthropic(api_key=anthropic_key) if anthropic_key else None
+        self.gpt_mini = AsyncOpenAI(api_key=openai_api) if openai_api else None
+        self.claude_model = "claude-sonnet-4-20250514"
+        self.gpt_model = "gpt-4o-mini"
 
-    async def evaluate_event(self, event: dict, context: dict | None = None) -> dict:
+    def _claude_available(self) -> bool:
+        return self.claude is not None
+
+    def _gpt_available(self) -> bool:
+        return self.gpt_mini is not None
+
+    async def evaluate_event(
+        self, event: dict, db: AsyncSession | None = None, snapshots: list[str] | None = None
+    ) -> dict:
         default = {
             "is_anomalous": False,
             "alert_level": "none",
@@ -36,71 +48,125 @@ class SheriffService:
             "message": None,
             "recommended_action": None,
         }
-        if not self._is_available():
-            logger.warning("Sheriff IA: ANTHROPIC_API_KEY no configurada")
-            return default
 
-        mode = (context or {}).get("mode", settings.sheriff_mode)
+        mode = event.get("sheriff_mode", settings.sheriff_mode)
         if mode == "off":
             return {**default, "reasoning": "Sheriff desactivado"}
 
-        prompt = (
-            f"Eres el Sheriff de seguridad del hogar de Alonso en Lima, Perú.\n\n"
+        # Paso 1: Triage con GPT-4.5 mini si hay snapshots
+        if snapshots and self._gpt_available():
+            triage = await self._triage_with_gpt(event, snapshots)
+            if not triage.get("needs_review", True):
+                default["reasoning"] = triage.get("reasoning", "Descartado por triage visual")
+                logger.info(f"Triage GPT: evento {event.get('id','')} descartado")
+                return default
+
+        # Paso 2: RAG context
+        context_str = ""
+        if db is not None:
+            try:
+                context_str = await rag_service.build_context(event, db)
+            except Exception as e:
+                logger.warning(f"RAGService error: {e}")
+                context_str = "{}"
+
+        # Paso 3: Evaluación con Claude
+        if self._claude_available():
+            return await self._evaluate_with_claude(event, context_str)
+
+        logger.warning("Sheriff IA: ANTHROPIC_API_KEY no configurada")
+        return default
+
+        return default
+
+    async def _triage_with_gpt(self, event: dict, snapshots: list[str]) -> dict:
+        try:
+            content = [{"type": "text", "text": (
+                "Eres un asistente de seguridad. Analiza esta imagen de una cámara de vigilancia.\n"
+                "Responde SOLO en JSON:\n"
+                '{"needs_review": bool, "reasoning": "explicación breve", '
+                '"confidence": 0.0-1.0}'
+            )}]
+            for snap in snapshots[:3]:
+                content.append({"type": "image_url", "image_url": {"url": snap}})
+
+            response = await self.gpt_mini.chat.completions.create(
+                model=self.gpt_model,
+                max_tokens=150,
+                temperature=0.1,
+                messages=[{"role": "user", "content": content}],
+            )
+            text = response.choices[0].message.content or "{}"
+            return self._parse_json_response(text)
+        except Exception as e:
+            logger.error(f"GPT triage error: {e}")
+            return {"needs_review": True, "reasoning": f"Error en triage: {e}", "confidence": 0.0}
+
+    @staticmethod
+    def _parse_json_response(text: str) -> dict:
+        cleaned = text.strip()
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
+        if match:
+            cleaned = match.group(1).strip()
+        return json.loads(cleaned)
+
+    async def _evaluate_with_claude(self, event: dict, context_str: str) -> dict:
+        default = {
+            "is_anomalous": False,
+            "alert_level": "none",
+            "reasoning": "Error en evaluación",
+            "message": None,
+            "recommended_action": None,
+        }
+
+        user_message = (
             f"EVENTO ACTUAL:\n"
             f"- Dispositivo: {event.get('device_name', event.get('device_id', 'desconocido'))}\n"
             f"- Zona: {event.get('zone', 'desconocida')}\n"
             f"- Tipo: {event.get('event_type', 'desconocido')}\n"
             f"- Timestamp: {event.get('timestamp', 'desconocido')}\n\n"
-            f"CONTEXTO:\n"
-            f"- Modo actual: {mode}\n"
-            f"- Última actividad conocida: {context.get('last_activity', 'desconocida') if context else 'desconocida'}\n\n"
-            f"DECISIÓN REQUERIDA:\n"
-            f"Analiza si este evento es anómalo y merece alerta.\n"
-            f"Responde SOLO en JSON:\n"
-            f'{{"is_anomalous": bool, "alert_level": "none|low|medium|high|critical", '
-            f'"reasoning": "explicación breve", '
-            f'"message": "mensaje para Alonso (si aplica)", '
-            f'"recommended_action": "descripción"}}'
+            f"CONTEXTO DEL SISTEMA:\n{context_str}\n\n"
+            f"Analiza este evento con el contexto proporcionado. "
+            f"Decide si es anómalo y qué nivel de alerta merece."
         )
 
         try:
-            response = await self.client.messages.create(
-                model=self.model,
+            response = await self.claude.messages.create(
+                model=self.claude_model,
                 max_tokens=500,
-                messages=[{"role": "user", "content": prompt}],
+                system=[
+                    {
+                        "type": "text",
+                        "text": SYSTEM_PROMPT,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=[{"role": "user", "content": user_message}],
             )
             text = response.content[0].text if response.content else "{}"
-            cleaned = text.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1].rsplit("\n", 1)[0]
-                if cleaned.endswith("```"):
-                    cleaned = cleaned[:-3]
-            return json.loads(cleaned)
+            return self._parse_json_response(text)
+        except json.JSONDecodeError as e:
+            logger.error(f"Claude response parse error: {e}, raw: {text[:200]}")
+            return {**default, "reasoning": f"Error parseando respuesta: {e}"}
         except Exception as e:
-            logger.error(f"Sheriff IA error: {e}")
+            logger.error(f"Claude evaluation error: {e}")
             return {**default, "reasoning": f"Error al evaluar: {e}"}
 
     async def chat(self, message: str, conversation_history: list | None = None) -> str:
-        if not self._is_available():
+        if not self._claude_available():
             return (
                 "Sheriff IA no disponible. Configura ANTHROPIC_API_KEY en el .env "
                 "y reinicia el servidor."
             )
 
-        system_prompt = (
-            f"Eres el Sheriff, el agente de seguridad del hogar de Alonso en Lima, Perú.\n"
-            f"Responde de forma concisa y útil basándote en el contexto del hogar.\n"
-            f"{_build_home_context()}"
-        )
-
         messages = list(conversation_history or [])
         messages.append({"role": "user", "content": message})
 
         try:
-            response = await self.client.messages.create(
-                model=self.model,
+            response = await self.claude.messages.create(
+                model=self.claude_model,
                 max_tokens=1000,
-                system=system_prompt,
+                system=[{"type": "text", "text": SYSTEM_PROMPT}],
                 messages=messages,
             )
             return response.content[0].text if response.content else ""
