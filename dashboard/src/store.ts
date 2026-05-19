@@ -25,7 +25,6 @@ interface AppState {
   clearError: () => void
 
   fetchInitial: () => Promise<void>
-  requestSnapshot: () => Promise<void>
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -69,18 +68,6 @@ export const useStore = create<AppState>((set) => ({
       set({ error: `No se puede conectar al backend: ${(e as Error).message}` })
     } finally {
       set({ loading: false })
-    }
-  },
-
-  requestSnapshot: async () => {
-    try {
-      const res = await fetch(`${API}/api/v1/tapo/snapshot`, { method: 'POST' })
-      if (res.ok) {
-        const data = await res.json()
-        set({ snapshotUrl: data.url || null })
-      }
-    } catch {
-      set({ error: 'Error al solicitar snapshot' })
     }
   },
 }))

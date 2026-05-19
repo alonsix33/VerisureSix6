@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.db.database import init_db
@@ -54,6 +54,20 @@ app.include_router(events.router, prefix="/api/v1")
 app.include_router(devices.router, prefix="/api/v1")
 app.include_router(sheriff.router, prefix="/api/v1")
 app.include_router(ws.router)
+
+
+tapo_router = APIRouter(prefix="/api/v1/tapo", tags=["tapo"])
+
+
+@tapo_router.post("/snapshot")
+async def tapo_snapshot():
+    url = await tapo_service.get_snapshot()
+    if url:
+        return {"url": url, "status": "ok"}
+    return {"url": None, "status": "placeholder", "message": "Tapo no disponible"}
+
+
+app.include_router(tapo_router)
 
 
 @app.get("/health")
