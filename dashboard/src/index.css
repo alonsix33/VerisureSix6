@@ -1,32 +1,185 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════
+   Material Design 3 — Dark Theme Tokens
+   ═══════════════════════════════════════════ */
+
 :root {
-  --color-bg: #0f172a;
-  --color-surface: #1e293b;
-  --color-surface-hover: #334155;
-  --color-border: #334155;
-  --color-text: #f1f5f9;
-  --color-text-muted: #94a3b8;
-  --color-accent: #3b82f6;
-  --color-accent-hover: #2563eb;
-  --color-green: #22c55e;
-  --color-yellow: #eab308;
-  --color-orange: #f97316;
-  --color-red: #ef4444;
-  --color-critical: #dc2626;
+  /* M3 Color — Dark scheme */
+  --md-primary: #3b82f6;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #1d4ed8;
+  --md-on-primary-container: #dbeafe;
+
+  --md-secondary: #94a3b8;
+  --md-on-secondary: #0f172a;
+  --md-secondary-container: #1e293b;
+  --md-on-secondary-container: #cbd5e1;
+
+  --md-tertiary: #a78bfa;
+  --md-on-tertiary: #1e1b4b;
+  --md-tertiary-container: #4c1d95;
+  --md-on-tertiary-container: #ddd6fe;
+
+  --md-error: #ef4444;
+  --md-on-error: #ffffff;
+  --md-error-container: #7f1d1d;
+  --md-on-error-container: #fecaca;
+
+  /* Surface colors */
+  --md-surface: #0f172a;
+  --md-surface-dim: #0f172a;
+  --md-surface-bright: #1e293b;
+  --md-surface-container-lowest: #020617;
+  --md-surface-container-low: #0f172a;
+  --md-surface-container: #1e293b;
+  --md-surface-container-high: #334155;
+  --md-surface-container-highest: #475569;
+  --md-on-surface: #f1f5f9;
+  --md-on-surface-variant: #94a3b8;
+  --md-outline: #334155;
+  --md-outline-variant: #1e293b;
+
+  /* Elevation shadows (M3) */
+  --md-elevation-0: none;
+  --md-elevation-1: 0 1px 2px 0 rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
+  --md-elevation-2: 0 1px 2px 0 rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
+  --md-elevation-3: 0 4px 8px 3px rgba(0,0,0,0.3), 0 1px 3px 0 rgba(0,0,0,0.15);
+  --md-elevation-4: 0 6px 10px 4px rgba(0,0,0,0.3), 0 2px 4px 0 rgba(0,0,0,0.15);
+  --md-elevation-5: 0 8px 12px 6px rgba(0,0,0,0.3), 0 4px 8px 2px rgba(0,0,0,0.15);
+
+  /* Shape */
+  --md-shape-xs: 4px;
+  --md-shape-sm: 8px;
+  --md-shape-md: 12px;
+  --md-shape-lg: 16px;
+  --md-shape-xl: 20px;
+  --md-shape-full: 9999px;
+
+  /* Typography scale */
+  --md-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --md-label-xs: 0.625rem;
+  --md-label-sm: 0.75rem;
+  --md-label-md: 0.875rem;
+  --md-label-lg: 1rem;
+  --md-body-sm: 0.75rem;
+  --md-body-md: 0.875rem;
+  --md-body-lg: 1rem;
+  --md-title-sm: 0.875rem;
+  --md-title-md: 1rem;
+  --md-title-lg: 1.375rem;
+  --md-headline-sm: 1.5rem;
+  --md-headline-md: 1.75rem;
+  --md-headline-lg: 2rem;
 }
+
+/* ═══════════════════════════════════════════
+   Global reset
+   ═══════════════════════════════════════════ */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root {
   height: 100%;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font-family: var(--md-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-body { overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+body {
+  overflow-x: hidden;
+}
+
+/* ═══════════════════════════════════════════
+   Scrollbar styling
+   ═══════════════════════════════════════════ */
 
 .scrollbar-thin::-webkit-scrollbar { width: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--md-surface-container-high);
+  border-radius: var(--md-shape-full);
+}
+
+/* ═══════════════════════════════════════════
+   Animations
+   ═══════════════════════════════════════════ */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ═══════════════════════════════════════════
+   Utility classes
+   ═══════════════════════════════════════════ */
+
+.md-card {
+  background: var(--md-surface-container-low);
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-md);
+  box-shadow: var(--md-elevation-1);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.md-card:hover {
+  box-shadow: var(--md-elevation-2);
+}
+
+.md-card-interactive:hover {
+  box-shadow: var(--md-elevation-2);
+  transform: translateY(-1px);
+  cursor: pointer;
+}
+
+.md-surface {
+  background: var(--md-surface-container);
+  border-radius: var(--md-shape-md);
+}
+
+.md-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--md-surface-container-high);
+  border-radius: var(--md-shape-full);
+  font-size: var(--md-label-sm);
+  color: var(--md-on-surface-variant);
+  transition: background 0.2s ease;
+}
+
+.md-chip:hover {
+  background: var(--md-surface-container-highest);
+}
+
+.md-chip-active {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.md-chip-active:hover {
+  background: var(--md-primary-container);
+}
+
+.md-divider {
+  height: 1px;
+  background: var(--md-outline);
+  border: none;
+  margin: 8px 0;
+}

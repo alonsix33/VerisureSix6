@@ -1,37 +1,31 @@
 import { useStore } from '../store'
 import type { EventData } from '../types'
 
-const LEVEL_COLORS: Record<string, string> = {
-  none: 'bg-slate-700',
-  low: 'bg-yellow-500',
-  medium: 'bg-orange-500',
-  high: 'bg-red-500',
-  critical: 'bg-red-600 animate-pulse',
-}
-
-const LEVEL_LABELS: Record<string, string> = {
-  none: 'Normal',
-  low: 'Baja',
-  medium: 'Media',
-  high: 'Alta',
-  critical: 'Crítica',
+const LEVEL_CONFIG: Record<string, { color: string; textColor: string; bg: string; border: string; label: string }> = {
+  none:    { color: 'bg-slate-500',  textColor: 'text-slate-400',  bg: 'bg-slate-900',     border: 'border-slate-500',  label: 'Normal' },
+  low:     { color: 'bg-yellow-500', textColor: 'text-yellow-400', bg: 'bg-yellow-900/30',  border: 'border-yellow-500', label: 'Baja' },
+  medium:  { color: 'bg-orange-500', textColor: 'text-orange-400', bg: 'bg-orange-900/30',  border: 'border-orange-500', label: 'Media' },
+  high:    { color: 'bg-red-500',    textColor: 'text-red-400',    bg: 'bg-red-900/30',     border: 'border-red-500',    label: 'Alta' },
+  critical:{ color: 'bg-red-600',    textColor: 'text-red-400',    bg: 'bg-red-900/50',     border: 'border-red-600',    label: 'Crítica' },
 }
 
 interface Props {
   limit?: number
   showAll?: boolean
+  events?: EventData[]
 }
 
-export default function EventTimeline({ limit = 50, showAll }: Props) {
-  const events = useStore((s) => s.events)
+export default function EventTimeline({ limit = 50, showAll, events: propEvents }: Props) {
+  const storeEvents = useStore((s) => s.events)
+  const events = propEvents ?? storeEvents
 
-  const display = showAll ? events.slice(0, limit) : events.filter(
-    (e) => e.alert_level !== 'none'
-  ).slice(0, limit)
+  const display = showAll
+    ? events.slice(0, limit)
+    : events.filter((e) => e.alert_level !== 'none').slice(0, limit)
 
   if (display.length === 0) {
     return (
-      <div className="text-sm text-slate-500 text-center py-8">
+      <div className="text-sm text-[var(--md-on-surface-variant)] text-center py-10">
         {showAll ? 'No hay eventos registrados' : 'No hay alertas activas'}
       </div>
     )
@@ -39,14 +33,19 @@ export default function EventTimeline({ limit = 50, showAll }: Props) {
 
   return (
     <div className="space-y-2">
-      {display.map((event) => (
-        <EventCard key={event.id} event={event} />
+      {display.map((event, i) => (
+        <div key={event.id} className="animate-fade-in" style={{ animationDelay: `${i * 20}ms` }}>
+          <EventCard event={event} />
+        </div>
       ))}
     </div>
   )
 }
 
 function EventCard({ event }: { event: EventData }) {
+  const level = event.alert_level || 'none'
+  const cfg = LEVEL_CONFIG[level] || LEVEL_CONFIG.none
+
   const time = event.timestamp
     ? new Date(event.timestamp).toLocaleString('es-PE', {
         hour: '2-digit',
@@ -57,40 +56,39 @@ function EventCard({ event }: { event: EventData }) {
     : '—'
 
   return (
-    <div className="flex items-start gap-3 bg-slate-900 border border-slate-800 rounded-xl p-3">
-      <div
-        className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${
-          LEVEL_COLORS[event.alert_level] || 'bg-slate-700'
-        }`}
-      />
+    <div className={`md-card p-3 flex items-start gap-3 ${level !== 'none' ? `border-l-2 ${cfg.border}` : ''}`}>
+      {/* Indicator */}
+      <div className="relative mt-1 shrink-0">
+        <span className={`block w-2.5 h-2.5 rounded-full ${cfg.color}`} />
+      </div>
+
+      {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-white truncate">
+          <span className="text-sm font-medium text-[var(--md-on-surface)] truncate">
             {event.device_name || event.device_id}
           </span>
-          {event.alert_level !== 'none' && (
-            <span
-              className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                event.alert_level === 'high' || event.alert_level === 'critical'
-                  ? 'bg-red-900/50 text-red-300'
-                  : 'bg-yellow-900/50 text-yellow-300'
-              }`}
-            >
-              {LEVEL_LABELS[event.alert_level]}
+          {level !== 'none' && (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${cfg.bg} ${cfg.textColor}`}>
+              {cfg.label}
             </span>
           )}
         </div>
-        <div className="text-xs text-slate-400 mt-0.5">
+        <div className="text-xs text-[var(--md-on-surface-variant)] mt-0.5">
           {event.event_type}
           {event.zone ? ` · ${event.zone}` : ''}
         </div>
-        {event.sheriff_decision?.reasoning && event.alert_level !== 'none' && (
-          <div className="text-xs text-slate-500 mt-1 italic">
+        {event.sheriff_decision?.reasoning && level !== 'none' && (
+          <div className="text-xs text-[var(--md-on-surface-variant)]/70 mt-1.5 italic leading-relaxed">
             {event.sheriff_decision.reasoning}
           </div>
         )}
       </div>
-      <div className="text-[10px] text-slate-500 shrink-0">{time}</div>
+
+      {/* Time */}
+      <div className="text-[10px] text-[var(--md-on-surface-variant)] shrink-0">
+        {time}
+      </div>
     </div>
   )
 }

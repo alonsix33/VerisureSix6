@@ -10,6 +10,9 @@ interface AppState {
   health: HealthStatus | null
   wsConnected: boolean
   sidebarOpen: boolean
+  loading: boolean
+  error: string | null
+  snapshotUrl: string | null
 
   setEvents: (events: EventData[]) => void
   addEvent: (event: EventData) => void
@@ -18,8 +21,11 @@ interface AppState {
   setHealth: (health: HealthStatus) => void
   setWsConnected: (v: boolean) => void
   setSidebarOpen: (v: boolean) => void
+  setSnapshotUrl: (v: string | null) => void
+  clearError: () => void
 
   fetchInitial: () => Promise<void>
+  requestSnapshot: () => Promise<void>
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -29,25 +35,52 @@ export const useStore = create<AppState>((set) => ({
   health: null,
   wsConnected: false,
   sidebarOpen: false,
+  loading: true,
+  error: null,
+  snapshotUrl: null,
 
   setEvents: (events) => set({ events }),
-  addEvent: (event) => set((s) => ({ events: [event, ...s.events].slice(0, 500) })),
+  addEvent: (event) => set((s) => ({ events: [event, ...s.events].slice(0, 500), error: null })),
   setDevices: (devices) => set({ devices }),
   setConfig: (config) => set({ config }),
   setHealth: (health) => set({ health }),
   setWsConnected: (v) => set({ wsConnected: v }),
   setSidebarOpen: (v) => set({ sidebarOpen: v }),
+  setSnapshotUrl: (v) => set({ snapshotUrl: v }),
+  clearError: () => set({ error: null }),
 
   fetchInitial: async () => {
-    const [eventsRes, devicesRes, configRes, healthRes] = await Promise.all([
-      fetch(`${API}/api/v1/events?limit=50`),
-      fetch(`${API}/api/v1/devices`),
-      fetch(`${API}/api/v1/sheriff/config`),
-      fetch(`${API}/health`),
-    ])
-    if (eventsRes.ok) set({ events: await eventsRes.json() })
-    if (devicesRes.ok) set({ devices: await devicesRes.json() })
-    if (configRes.ok) set({ config: await configRes.json() })
-    if (healthRes.ok) set({ health: await healthRes.json() })
+    set({ loading: true, error: null })
+    try {
+      const [eventsRes, devicesRes, configRes, healthRes] = await Promise.all([
+        fetch(`${API}/api/v1/events?limit=50`),
+        fetch(`${API}/api/v1/devices`),
+        fetch(`${API}/api/v1/sheriff/config`),
+        fetch(`${API}/health`),
+      ])
+      if (eventsRes.ok) set({ events: await eventsRes.json() })
+      if (devicesRes.ok) set({ devices: await devicesRes.json() })
+      if (configRes.ok) set({ config: await configRes.json() })
+      if (healthRes.ok) set({ health: await healthRes.json() })
+      if (!eventsRes.ok || !healthRes.ok) {
+        set({ error: 'Error al conectar con el servidor' })
+      }
+    } catch (e) {
+      set({ error: `No se puede conectar al backend: ${(e as Error).message}` })
+    } finally {
+      set({ loading: false })
+    }
+  },
+
+  requestSnapshot: async () => {
+    try {
+      const res = await fetch(`${API}/api/v1/tapo/snapshot`, { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        set({ snapshotUrl: data.url || null })
+      }
+    } catch {
+      set({ error: 'Error al solicitar snapshot' })
+    }
   },
 }))

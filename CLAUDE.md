@@ -204,7 +204,7 @@ sudo systemctl enable verisure-rf-listener
 - Deploy: systemd services + install.sh para Orange Pi
 - Subagente verificador: corrigió AsyncAnthropic, singletons, CORS, types
 
-### Sesión 3 — 18 mayo 2026
+### Sesión 3 — 18 mayo 2026 (mañana)
 - Investigación RAG: Contextual Retrieval (Anthropic), Prompt Caching
 - RAGService: build_context con eventos recientes, patrones por hora, modo Sheriff
 - Sheriff router: GPT-4.5 mini triage → RAG context → Claude evaluation
@@ -215,6 +215,19 @@ sudo systemctl enable verisure-rf-listener
 - Componentes: Home, Timeline, Config, Chat, EventTimeline, AlertHistory
 - WebSocket hook con reconexión automática
 - Subagente verificador: corrijió iconos PWA, dead code, .env.example, lang
+
+### Sesión 3 — 18 mayo 2026 (tarde)
+- M3 redesign completo: design tokens (color, elevation, shape, typography), clases utilitarias
+- Lucide icons: reemplazo de emojis por iconos vectoriales (Layout, Home, Timeline, Config, Chat)
+- Loading states: skeleton cards y listas en Home, TimelinePage
+- Error UI: banner global en Layout con dismiss, manejo en store
+- TimelinePage: auto-carga si events vacío, filtros por nivel y zona, conteo, skeletons
+- CamerasPage: snapshot button, integración HomeMap, device list dinámica desde store
+- ChatPage: M3 filled input, typing indicator (dots animados), scroll automático
+- AlertHistory: M3 card con border-left dinámico por nivel, animaciones escalonadas
+- HomeMap: SVG floor plan animado con pulse-ring, dots por zona, leyenda
+- Store: loading/error states, fetchInitial con try/catch, clearError
+- Subagente verificador: 11 issues corregidos (PNG icon, border color, dependency fantasma, emoji, snapshot duplicado, device list, replace string, Map type, all type)
 
 ## Testing
 

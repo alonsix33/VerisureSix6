@@ -58,3 +58,6 @@ export interface HealthStatus {
     tapo: { running: boolean; hub: string }
   }
 }
+
+export type AlertLevel = 'none' | 'low' | 'medium' | 'high' | 'critical'
+export type FilterLevel = AlertLevel | 'all'
