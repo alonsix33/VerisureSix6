@@ -89,16 +89,19 @@ async def create_event(data: EventCreate, db: AsyncSession = Depends(get_db)):
         },
         db=db,
     )
-    if decision.get("alert_level") != "none":
-        event.alert_level = decision["alert_level"]
-        event.sheriff_evaluated = True
-        event.sheriff_decision = decision
-        await db.commit()
-        await db.refresh(event)
 
+    event.sheriff_evaluated = True
+    event.sheriff_decision = decision
+    alert_level = decision.get("alert_level", "none")
+    if alert_level != "none":
+        event.alert_level = alert_level
+    await db.commit()
+    await db.refresh(event)
+
+    if alert_level != "none":
         await alert_service.send_alert(
             message=decision.get("message", "Evento detectado"),
-            level=decision.get("alert_level", "info"),
+            level=alert_level,
         )
 
     await broadcast_event({

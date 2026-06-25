@@ -1,5 +1,4 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-import json
 from datetime import datetime, timezone
 
 router = APIRouter()
@@ -13,8 +12,7 @@ async def websocket_events(websocket: WebSocket):
     connected_clients.add(websocket)
     try:
         while True:
-            data = await websocket.receive_text()
-            await websocket.send_text(json.dumps({"status": "ok", "echo": data}))
+            await websocket.receive_text()
     except WebSocketDisconnect:
         connected_clients.discard(websocket)
 

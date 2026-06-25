@@ -1,13 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
 from backend.db.database import get_db
 from backend.models.config import SheriffConfig
+from backend.models.conversation import Conversation
 from backend.services.sheriff_service import sheriff_service
-from pydantic import BaseModel
+from backend.settings import settings
 
 router = APIRouter(prefix="/sheriff", tags=["sheriff"])
 
@@ -43,8 +45,28 @@ class ChatRequest(BaseModel):
     message: str
 
 
-class ChatResponse(BaseModel):
-    response: str
+class ChatMessage(BaseModel):
+    id: str
+    role: str
+    content: str
+    model_used: str | None
+    timestamp: datetime
+
+    model_config = {"from_attributes": True}
+
+
+@router.get("/status")
+async def get_status(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(SheriffConfig).limit(1))
+    config = result.scalar_one_or_none()
+    mode = config.mode if config else settings.sheriff_mode
+    return {
+        "mode": mode,
+        "mock_sensors": settings.mock_sensors,
+        "claude_available": bool(settings.anthropic_api_key.get_secret_value()),
+        "openai_available": bool(settings.openai_api_key.get_secret_value()),
+        "push_configured": bool(settings.vapid_public_key),
+    }
 
 
 @router.get("/config", response_model=SheriffConfigResponse)
@@ -73,7 +95,37 @@ async def update_config(data: SheriffConfigUpdate, db: AsyncSession = Depends(ge
     return config
 
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat(data: ChatRequest):
-    response = await sheriff_service.chat(data.message)
-    return ChatResponse(response=response)
+@router.post("/chat")
+async def chat(data: ChatRequest, db: AsyncSession = Depends(get_db)):
+    # Load recent history for context (last 20 turns)
+    result = await db.execute(
+        select(Conversation).order_by(desc(Conversation.timestamp)).limit(20)
+    )
+    recent = list(reversed(result.scalars().all()))
+    history = [{"role": msg.role if msg.role == "user" else "assistant", "content": msg.content} for msg in recent]
+
+    response_text, model_used, tokens = await sheriff_service.chat_with_meta(data.message, history)
+
+    # Persist both turns
+    user_msg = Conversation(role="user", content=data.message)
+    sheriff_msg = Conversation(role="sheriff", content=response_text, model_used=model_used, tokens_used=tokens)
+    db.add(user_msg)
+    db.add(sheriff_msg)
+    await db.commit()
+
+    return {"response": response_text, "model_used": model_used}
+
+
+@router.get("/chat/history", response_model=list[ChatMessage])
+async def get_chat_history(limit: int = 50, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Conversation).order_by(desc(Conversation.timestamp)).limit(limit)
+    )
+    return list(reversed(result.scalars().all()))
+
+
+@router.delete("/chat/history", status_code=204)
+async def clear_chat_history(db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import delete
+    await db.execute(delete(Conversation))
+    await db.commit()

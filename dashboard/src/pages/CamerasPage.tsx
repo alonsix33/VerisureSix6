@@ -1,109 +1,142 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { useStore } from '../store'
+import { Camera, MapPin, RefreshCw, Wifi, Battery } from 'lucide-react'
 import HomeMap from '../components/HomeMap'
-import { Camera, Wifi, RefreshCw } from 'lucide-react'
+import { API } from '../store'
+
+const DEVICE_TYPE_ICON: Record<string, string> = {
+  verisure_pir:  '👁',
+  tapo_camera:   '📷',
+  verisure_hub:  '📡',
+  tapo_hub:      '🔌',
+}
 
 export default function CamerasPage() {
-  const snapshotUrl = useStore((s) => s.snapshotUrl)
-  const setSnapshotUrl = useStore((s) => s.setSnapshotUrl)
-  const devices = useStore((s) => s.devices)
-  const [loading, setLoading] = useState(false)
-  const [timestamp, setTimestamp] = useState('')
+  const devices    = useStore((s) => s.devices)
+  const events     = useStore((s) => s.events)
+  const fetchInitial = useStore((s) => s.fetchInitial)
+  const [snapping, setSnapping] = useState<string | null>(null)
+  const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null)
 
-  async function handleSnapshot() {
-    setLoading(true)
+  useEffect(() => {
+    if (devices.length === 0) fetchInitial()
+  }, [devices.length, fetchInitial])
+
+  async function requestSnapshot(deviceId: string) {
+    setSnapping(deviceId)
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/api/v1/tapo/snapshot`, { method: 'POST' })
-      if (res.ok) {
-        const data = await res.json()
-        setSnapshotUrl(data.url || null)
-        setTimestamp(new Date().toLocaleString('es-PE'))
-      }
-    } catch { /* ignore */ }
-    setLoading(false)
+      const res = await fetch(`${API}/api/v1/tapo/snapshot`, { method: 'POST' })
+      const data = await res.json()
+      if (data.url) setSnapshotUrl(data.url)
+    } catch { /* silent */ }
+    setSnapping(null)
   }
 
-  const activeDevices = devices.length > 0 ? devices : [
-    { name: 'Hub Tapo H200', meta: '192.168.68.62 · Hub' },
-    { name: 'Cámara Tapo C420', meta: 'Balcón · Cámara' },
-    { name: 'Sensor ES700IPDE #1', meta: 'Sala · PIR con cámara' },
-    { name: 'Sensor ES700IPDE #2', meta: 'Cocina · PIR con cámara' },
-  ]
-
   return (
-    <div className="space-y-6 max-w-2xl animate-fade-in">
-      <div className="flex items-center gap-3">
-        <Camera size={22} className="text-[var(--md-primary)]" />
-        <h1 className="text-[var(--md-title-lg)] font-bold text-[var(--md-on-surface)] tracking-tight">
-          Cámaras
-        </h1>
+    <div className="max-w-4xl space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-white">Dispositivos & Zonas</h1>
+        <p className="text-xs text-[#8080A0] mt-0.5">{devices.length} dispositivos registrados</p>
       </div>
 
-      <section className="md-card overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--md-outline-variant)]">
-          <div className="flex items-center gap-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-            <div>
-              <h3 className="text-sm font-medium text-[var(--md-on-surface)]">Tapo C420</h3>
-              <p className="text-xs text-[var(--md-on-surface-variant)]">Balcón — exterior</p>
-            </div>
-          </div>
-          <button
-            onClick={handleSnapshot}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium
-              bg-[var(--md-primary)] text-[var(--md-on-primary)]
-              hover:bg-[var(--md-primary-container)]
-              disabled:opacity-50 transition-all"
-          >
-            {loading ? (
-              <RefreshCw size={15} className="animate-spin" />
-            ) : (
-              <Camera size={15} />
-            )}
-            {loading ? 'Capturando...' : 'Tomar foto'}
-          </button>
-        </div>
+      {/* Home map */}
+      <div className="bg-[#12121A] border border-[#1A1A24] rounded-2xl p-5">
+        <div className="text-sm font-semibold text-white mb-4">Mapa del hogar</div>
+        <HomeMap />
+      </div>
 
-        {snapshotUrl ? (
-          <div className="p-4">
-            <img src={snapshotUrl} alt="Snapshot" className="w-full rounded-[var(--md-shape-sm)]" />
-            {timestamp && <p className="text-xs text-[var(--md-on-surface-variant)] mt-2">{timestamp}</p>}
+      {/* Devices grid */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {devices.length === 0 ? (
+          <div className="col-span-2 text-center py-12 text-[#4A4A60] text-sm">
+            Cargando dispositivos...
           </div>
         ) : (
-          <div className="py-16 text-center">
-            <Camera size={40} className="mx-auto text-[var(--md-surface-container-high)] mb-3" />
-            <p className="text-sm text-[var(--md-on-surface-variant)]">Presiona "Tomar foto"</p>
-            <p className="text-xs text-[var(--md-on-surface-variant)] mt-1 opacity-60">
-              Captura un snapshot desde la cámara del balcón
-            </p>
-          </div>
+          devices.map((device, idx) => {
+            const lastEvent = events.find((e) => e.device_id === device.device_id)
+            const isCamera = device.device_type === 'tapo_camera'
+            return (
+              <motion.div
+                key={device.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.06 }}
+                className="bg-[#12121A] border border-[#1A1A24] rounded-2xl p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-[#16161F] border border-[#23232F] flex items-center justify-center text-xl shrink-0">
+                    {DEVICE_TYPE_ICON[device.device_type] ?? '📱'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-white truncate">{device.name}</span>
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ background: device.enabled ? '#00D084' : '#4A4A60' }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <MapPin size={10} className="text-[#4A4A60]" />
+                      <span className="text-[11px] text-[#8080A0]">{device.zone ?? 'sin zona'}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-[10px] text-[#4A4A60] font-mono">{device.protocol.toUpperCase()}</span>
+                      {device.battery_level !== null && (
+                        <div className="flex items-center gap-1">
+                          <Battery size={10} className="text-[#4A4A60]" />
+                          <span className="text-[10px] text-[#8080A0]">{device.battery_level}%</span>
+                        </div>
+                      )}
+                      {device.signal_strength !== null && (
+                        <div className="flex items-center gap-1">
+                          <Wifi size={10} className="text-[#4A4A60]" />
+                          <span className="text-[10px] text-[#8080A0]">{device.signal_strength}dBm</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Last event */}
+                {lastEvent && (
+                  <div className="mt-3 pt-3 border-t border-[#1A1A24]">
+                    <div className="text-[10px] text-[#4A4A60] uppercase tracking-wider mb-1">Último evento</div>
+                    <div className="text-xs text-[#8080A0]">
+                      {lastEvent.event_type.replace(/_/g, ' ')} ·{' '}
+                      {new Date(lastEvent.timestamp).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Snapshot button for cameras */}
+                {isCamera && (
+                  <button
+                    onClick={() => requestSnapshot(device.device_id)}
+                    disabled={snapping === device.device_id}
+                    className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-[#16161F] border border-[#23232F] text-xs text-[#8080A0] hover:text-white hover:border-[#3B82F6]/30 transition-all disabled:opacity-50"
+                  >
+                    {snapping === device.device_id ? (
+                      <RefreshCw size={12} className="animate-spin" />
+                    ) : (
+                      <Camera size={12} />
+                    )}
+                    Solicitar snapshot
+                  </button>
+                )}
+              </motion.div>
+            )
+          })
         )}
-      </section>
+      </div>
 
-      <section>
-        <h2 className="text-xs font-semibold text-[var(--md-on-surface-variant)] uppercase tracking-[0.08em] mb-3 px-1 flex items-center gap-2">
-          <Camera size={14} /> Mapa del hogar
-        </h2>
-        <HomeMap />
-      </section>
-
-      <section>
-        <h2 className="text-xs font-semibold text-[var(--md-on-surface-variant)] uppercase tracking-[0.08em] mb-3 px-1 flex items-center gap-2">
-          <Wifi size={14} /> Dispositivos
-        </h2>
-        <div className="md-card divide-y divide-[var(--md-outline-variant)]">
-          {activeDevices.map((d: any, i: number) => (
-            <div key={i} className="flex items-center justify-between px-4 py-3">
-              <div>
-                <div className="text-sm text-[var(--md-on-surface)]">{d.name}</div>
-                <div className="text-xs text-[var(--md-on-surface-variant)]">{d.meta}</div>
-              </div>
-              <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-            </div>
-          ))}
+      {/* Snapshot preview */}
+      {snapshotUrl && (
+        <div className="bg-[#12121A] border border-[#1A1A24] rounded-2xl p-4">
+          <div className="text-sm font-semibold text-white mb-3">Último snapshot</div>
+          <img src={snapshotUrl} alt="Snapshot" className="w-full rounded-xl object-cover max-h-64" />
         </div>
-      </section>
+      )}
     </div>
   )
 }

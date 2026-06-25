@@ -1,0 +1,24 @@
+[Unit]
+Description=Sheriff Home — Backend FastAPI
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/verisure-home-platform
+EnvironmentFile=/home/ubuntu/verisure-home-platform/.env
+ExecStart=/home/ubuntu/verisure-home-platform/venv/bin/uvicorn \
+    backend.main:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --workers 1 \
+    --log-level info
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sheriff-backend
+
+[Install]
+WantedBy=multi-user.target

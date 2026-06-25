@@ -19,5 +19,5 @@ class SheriffConfig(Base):
     travel_periods: Mapped[list] = mapped_column(JSON, nullable=True)
     cooldown_minutes: Mapped[int] = mapped_column(Integer, default=5)
     escalation_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

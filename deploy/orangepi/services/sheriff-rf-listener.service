@@ -1,0 +1,19 @@
+[Unit]
+Description=Sheriff Home — RF Listener (RTL-SDR 869MHz)
+After=network.target sheriff-backend.service
+Wants=sheriff-backend.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/verisure-home-platform
+EnvironmentFile=/home/ubuntu/verisure-home-platform/.env
+ExecStart=/home/ubuntu/verisure-home-platform/venv/bin/python -m rf.listener
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sheriff-rf
+
+[Install]
+WantedBy=multi-user.target

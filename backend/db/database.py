@@ -21,7 +21,11 @@ async def get_db():
 
 async def init_db():
     async with engine.begin() as conn:
-        from backend.models.event import Event
-        from backend.models.device import Device
-        from backend.models.config import SheriffConfig
+        from backend.models.event import Event  # noqa: F401
+        from backend.models.device import Device  # noqa: F401
+        from backend.models.config import SheriffConfig  # noqa: F401
+        from backend.models.alert import Alert  # noqa: F401
+        from backend.models.schedule import Schedule  # noqa: F401
+        from backend.models.travel import TravelPeriod  # noqa: F401
+        from backend.models.conversation import Conversation, PushSubscription  # noqa: F401
         await conn.run_sync(Base.metadata.create_all)

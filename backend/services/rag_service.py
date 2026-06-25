@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -58,7 +59,6 @@ class RAGService:
             "current_time": event_time.isoformat(),
         }
 
-        import json
         return json.dumps(context, indent=2, ensure_ascii=False)
 
     async def get_trend_analysis(self, device_id: str, days: int, db: AsyncSession) -> str:
@@ -69,7 +69,6 @@ class RAGService:
         current = await self._count_events_since(db, device_id, period_start)
         previous = await self._count_events_since(db, device_id, prev_start, period_start)
 
-        import json
         return json.dumps({
             "device_id": device_id,
             "period_days": days,
@@ -118,7 +117,6 @@ class RAGService:
 
     async def _normal_pattern(self, db: AsyncSession, device_id: str, event_time: datetime) -> dict:
         hour = event_time.hour
-        weekday = event_time.weekday()
         two_weeks_ago = event_time - timedelta(days=14)
 
         count_in_window = await self._count_events_since(
