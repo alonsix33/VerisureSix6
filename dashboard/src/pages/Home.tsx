@@ -6,11 +6,12 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import { Link } from 'react-router-dom'
 
 const MODE_META = {
-  off:   { label: 'Apagado',  color: '#4A4A60', bg: 'bg-[#12121A]',    desc: 'Sistema inactivo' },
-  casa:  { label: 'Casa',     color: '#00D084', bg: 'bg-[#001A10]',    desc: 'Alguien en casa' },
-  fuera: { label: 'Fuera',    color: '#FFB800', bg: 'bg-[#1A1100]',    desc: 'Casa vacía' },
-  noche: { label: 'Noche',    color: '#A78BFA', bg: 'bg-[#100A1A]',    desc: 'Todos durmiendo' },
-  viaje: { label: 'Viaje',    color: '#FF3B3B', bg: 'bg-[#1A0505]',    desc: 'Máxima alerta 24/7' },
+  off:     { label: 'Apagado',  color: '#4A4A60', bg: 'bg-[#12121A]',    desc: 'Sistema inactivo' },
+  monitor: { label: 'Monitor',  color: '#3B82F6', bg: 'bg-[#0A1020]',    desc: 'Solo registra' },
+  casa:    { label: 'Casa',     color: '#00D084', bg: 'bg-[#001A10]',    desc: 'Alguien en casa' },
+  fuera:   { label: 'Fuera',    color: '#FFB800', bg: 'bg-[#1A1100]',    desc: 'Casa vacía' },
+  noche:   { label: 'Noche',    color: '#A78BFA', bg: 'bg-[#100A1A]',    desc: 'Todos durmiendo' },
+  viaje:   { label: 'Viaje',    color: '#FF3B3B', bg: 'bg-[#1A0505]',    desc: 'Máxima alerta 24/7' },
 } as const
 
 const ALERT_COLOR: Record<string, string> = {

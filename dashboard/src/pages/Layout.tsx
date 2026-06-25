@@ -15,11 +15,12 @@ const NAV_ITEMS = [
 ]
 
 const MODE_COLOR: Record<string, string> = {
-  casa:  'text-[#00D084]',
-  fuera: 'text-[#FFB800]',
-  noche: 'text-[#A78BFA]',
-  viaje: 'text-[#FF3B3B]',
-  off:   'text-[#4A4A60]',
+  monitor: 'text-[#3B82F6]',
+  casa:    'text-[#00D084]',
+  fuera:   'text-[#FFB800]',
+  noche:   'text-[#A78BFA]',
+  viaje:   'text-[#FF3B3B]',
+  off:     'text-[#4A4A60]',
 }
 
 export default function Layout() {

@@ -1,7 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { useStore } from '../store'
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://127.0.0.1:8000/ws/events'
+function deriveWsUrl(): string {
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+  return apiUrl.replace(/^http/, 'ws') + '/ws/events'
+}
+const WS_URL = deriveWsUrl()
 
 export function useWebSocket() {
   const addEvent = useStore((s) => s.addEvent)

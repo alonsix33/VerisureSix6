@@ -11,7 +11,7 @@ class SheriffConfig(Base):
     __tablename__ = "sheriff_config"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    mode: Mapped[str] = mapped_column(String, default="monitor")
+    mode: Mapped[str] = mapped_column(String, default="casa")
     vision_threshold: Mapped[float] = mapped_column(Float, default=0.85)
     alert_zones: Mapped[list] = mapped_column(JSON, default=lambda: [])
     ignored_zones: Mapped[list] = mapped_column(JSON, default=lambda: [])
