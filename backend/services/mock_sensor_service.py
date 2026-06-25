@@ -24,12 +24,17 @@ EVENT_TEMPLATES = [
 ]
 
 
+MAX_EVENTS_BEFORE_TRIM = 50
+TARGET_EVENT_COUNT = 15
+
+
 class MockSensorService:
     def __init__(self):
         self.running = False
         self._task: asyncio.Task | None = None
         self._base_url = "http://127.0.0.1:8000"
         self._devices_seeded = False
+        self._emit_count = 0
 
     async def start(self):
         self.running = True
@@ -61,11 +66,30 @@ class MockSensorService:
 
             while self.running:
                 try:
+                    self._emit_count += 1
+                    if self._emit_count % MAX_EVENTS_BEFORE_TRIM == 0:
+                        await self._trim_events(client)
                     await self._emit_event(client)
                 except Exception as e:
                     logger.warning(f"MockSensor: error emitiendo evento: {e}")
-                # Intervalo aleatorio entre 8-30 segundos
                 await asyncio.sleep(random.uniform(8, 30))
+
+    async def _trim_events(self, client: httpx.AsyncClient):
+        try:
+            r = await client.get(f"{self._base_url}/api/v1/events?limit=200")
+            if r.status_code != 200:
+                return
+            events_list = r.json()
+            if len(events_list) <= TARGET_EVENT_COUNT:
+                return
+            # Sort oldest first, delete all but the newest TARGET_EVENT_COUNT
+            sorted_events = sorted(events_list, key=lambda e: e.get("timestamp", ""))
+            to_delete = sorted_events[:-TARGET_EVENT_COUNT]
+            for ev in to_delete:
+                await client.delete(f"{self._base_url}/api/v1/events/{ev['id']}")
+            logger.info(f"MockSensor: trimmed {len(to_delete)} old events, kept {TARGET_EVENT_COUNT}")
+        except Exception as e:
+            logger.warning(f"MockSensor: error trimming events: {e}")
 
     async def _emit_event(self, client: httpx.AsyncClient):
         device = random.choice(MOCK_DEVICES)

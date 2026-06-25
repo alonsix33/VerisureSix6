@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useStore } from '../store'
-import { Camera, MapPin, RefreshCw, Wifi, Battery } from 'lucide-react'
+import { Camera, MapPin, RefreshCw, Wifi, Battery, Eye, Radio } from 'lucide-react'
 import HomeMap from '../components/HomeMap'
 import { API } from '../store'
 
-const DEVICE_TYPE_ICON: Record<string, string> = {
-  verisure_pir:  '👁',
-  tapo_camera:   '📷',
-  verisure_hub:  '📡',
-  tapo_hub:      '🔌',
+const DEVICE_ICON: Record<string, typeof Eye> = {
+  verisure_pir: Eye,
+  tapo_camera:  Camera,
+  verisure_hub: Radio,
+  tapo_hub:     Radio,
 }
 
 export default function CamerasPage() {
-  const devices    = useStore((s) => s.devices)
-  const events     = useStore((s) => s.events)
+  const devices      = useStore((s) => s.devices)
+  const events       = useStore((s) => s.events)
   const fetchInitial = useStore((s) => s.fetchInitial)
-  const [snapping, setSnapping] = useState<string | null>(null)
+  const [snapping, setSnapping]       = useState<string | null>(null)
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function CamerasPage() {
   async function requestSnapshot(deviceId: string) {
     setSnapping(deviceId)
     try {
-      const res = await fetch(`${API}/api/v1/tapo/snapshot`, { method: 'POST' })
+      const res  = await fetch(`${API}/api/v1/tapo/snapshot`, { method: 'POST' })
       const data = await res.json()
       if (data.url) setSnapshotUrl(data.url)
     } catch { /* silent */ }
@@ -36,62 +36,94 @@ export default function CamerasPage() {
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-white">Dispositivos & Zonas</h1>
-        <p className="text-xs text-[#8080A0] mt-0.5">{devices.length} dispositivos registrados</p>
+        <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          Dispositivos y Zonas
+        </h1>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+          {devices.length} dispositivos registrados
+        </p>
       </div>
 
       {/* Home map */}
-      <div className="bg-[#12121A] border border-[#1A1A24] rounded-2xl p-5">
-        <div className="text-sm font-semibold text-white mb-4">Mapa del hogar</div>
+      <div
+        className="rounded-2xl p-5"
+        style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)' }}
+      >
+        <div className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+          Mapa del hogar
+        </div>
         <HomeMap />
       </div>
 
-      {/* Devices grid */}
+      {/* Device cards */}
       <div className="grid gap-3 sm:grid-cols-2">
         {devices.length === 0 ? (
-          <div className="col-span-2 text-center py-12 text-[#4A4A60] text-sm">
+          <div className="col-span-2 text-center py-12 text-sm" style={{ color: 'var(--text-disabled)' }}>
             Cargando dispositivos...
           </div>
         ) : (
           devices.map((device, idx) => {
             const lastEvent = events.find((e) => e.device_id === device.device_id)
-            const isCamera = device.device_type === 'tapo_camera'
+            const isCamera  = device.device_type === 'tapo_camera'
+            const DevIcon   = DEVICE_ICON[device.device_type] ?? Eye
             return (
               <motion.div
                 key={device.id}
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.06 }}
-                className="bg-[#12121A] border border-[#1A1A24] rounded-2xl p-4"
+                transition={{ delay: idx * 0.05 }}
+                className="rounded-2xl p-4"
+                style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)' }}
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-[#16161F] border border-[#23232F] flex items-center justify-center text-xl shrink-0">
-                    {DEVICE_TYPE_ICON[device.device_type] ?? '📱'}
+                  {/* Icon */}
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: 'var(--surface-overlay)', border: '1px solid var(--border-subtle)' }}
+                  >
+                    <DevIcon size={18} style={{ color: device.enabled ? 'var(--accent-text)' : 'var(--text-disabled)' }} />
                   </div>
+
+                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-white truncate">{device.name}</span>
+                      <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                        {device.name}
+                      </span>
                       <span
                         className="w-2 h-2 rounded-full shrink-0"
-                        style={{ background: device.enabled ? '#00D084' : '#4A4A60' }}
+                        style={{ background: device.enabled ? 'var(--status-safe)' : 'var(--text-disabled)' }}
                       />
                     </div>
+
                     <div className="flex items-center gap-1.5 mt-1">
-                      <MapPin size={10} className="text-[#4A4A60]" />
-                      <span className="text-[11px] text-[#8080A0]">{device.zone ?? 'sin zona'}</span>
+                      <MapPin size={10} style={{ color: 'var(--text-disabled)' }} />
+                      <span className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                        {device.zone ?? 'sin zona'}
+                      </span>
                     </div>
+
                     <div className="flex items-center gap-3 mt-2">
-                      <span className="text-[10px] text-[#4A4A60] font-mono">{device.protocol.toUpperCase()}</span>
+                      <span
+                        className="text-[10px] font-mono px-2 py-0.5 rounded-full"
+                        style={{ background: 'var(--surface-float)', color: 'var(--text-tertiary)' }}
+                      >
+                        {device.protocol.toUpperCase()}
+                      </span>
                       {device.battery_level !== null && (
                         <div className="flex items-center gap-1">
-                          <Battery size={10} className="text-[#4A4A60]" />
-                          <span className="text-[10px] text-[#8080A0]">{device.battery_level}%</span>
+                          <Battery size={10} style={{ color: 'var(--text-disabled)' }} />
+                          <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+                            {device.battery_level}%
+                          </span>
                         </div>
                       )}
                       {device.signal_strength !== null && (
                         <div className="flex items-center gap-1">
-                          <Wifi size={10} className="text-[#4A4A60]" />
-                          <span className="text-[10px] text-[#8080A0]">{device.signal_strength}dBm</span>
+                          <Wifi size={10} style={{ color: 'var(--text-disabled)' }} />
+                          <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+                            {device.signal_strength}dBm
+                          </span>
                         </div>
                       )}
                     </div>
@@ -100,21 +132,36 @@ export default function CamerasPage() {
 
                 {/* Last event */}
                 {lastEvent && (
-                  <div className="mt-3 pt-3 border-t border-[#1A1A24]">
-                    <div className="text-[10px] text-[#4A4A60] uppercase tracking-wider mb-1">Último evento</div>
-                    <div className="text-xs text-[#8080A0]">
+                  <div
+                    className="mt-3 pt-3"
+                    style={{ borderTop: '1px solid var(--border-subtle)' }}
+                  >
+                    <div
+                      className="text-[10px] uppercase tracking-wider mb-1"
+                      style={{ color: 'var(--text-disabled)' }}
+                    >
+                      Último evento
+                    </div>
+                    <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                       {lastEvent.event_type.replace(/_/g, ' ')} ·{' '}
-                      {new Date(lastEvent.timestamp).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(lastEvent.timestamp).toLocaleTimeString('es-PE', {
+                        hour: '2-digit', minute: '2-digit',
+                      })}
                     </div>
                   </div>
                 )}
 
-                {/* Snapshot button for cameras */}
+                {/* Snapshot button */}
                 {isCamera && (
                   <button
                     onClick={() => requestSnapshot(device.device_id)}
                     disabled={snapping === device.device_id}
-                    className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-[#16161F] border border-[#23232F] text-xs text-[#8080A0] hover:text-white hover:border-[#3B82F6]/30 transition-all disabled:opacity-50"
+                    className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs transition-all disabled:opacity-50"
+                    style={{
+                      background: 'var(--surface-overlay)',
+                      border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-tertiary)',
+                    }}
                   >
                     {snapping === device.device_id ? (
                       <RefreshCw size={12} className="animate-spin" />
@@ -132,8 +179,13 @@ export default function CamerasPage() {
 
       {/* Snapshot preview */}
       {snapshotUrl && (
-        <div className="bg-[#12121A] border border-[#1A1A24] rounded-2xl p-4">
-          <div className="text-sm font-semibold text-white mb-3">Último snapshot</div>
+        <div
+          className="rounded-2xl p-4"
+          style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)' }}
+        >
+          <div className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
+            Último snapshot
+          </div>
           <img src={snapshotUrl} alt="Snapshot" className="w-full rounded-xl object-cover max-h-64" />
         </div>
       )}

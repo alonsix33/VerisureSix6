@@ -1,286 +1,143 @@
+@import "./tokens.css";
 @import "tailwindcss";
 
-/* ═══════════════════════════════════════════
-   Sheriff Home — Design Tokens
-   ═══════════════════════════════════════════ */
+/* ── Tailwind v4 theme — tokens as utility classes ── */
+@theme {
+  --color-surface-base:    var(--surface-base);
+  --color-surface-raised:  var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-float:   var(--surface-float);
+  --color-surface-hover:   var(--surface-hover);
 
-:root {
-  /* Background */
-  --bg: #0A0A0F;
-  --bg-card: #12121A;
-  --bg-card-hover: #16161F;
-  --bg-elevated: #1A1A24;
-  --bg-border: #23232F;
-  --bg-border-bright: #2E2E3E;
+  --color-border-subtle:  var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong:  var(--border-strong);
 
-  /* Semantic colors */
-  --color-success: #00D084;
-  --color-warning: #FFB800;
-  --color-danger: #FF3B3B;
-  --color-info: #3B82F6;
-  --color-purple: #A78BFA;
+  --color-text-primary:   var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary:  var(--text-tertiary);
+  --color-text-disabled:  var(--text-disabled);
 
-  /* Alert level colors */
-  --alert-none-bg: #12121A;
-  --alert-none-border: #23232F;
-  --alert-low-bg: #0A1A10;
-  --alert-low-border: #00D084;
-  --alert-medium-bg: #1A1400;
-  --alert-medium-border: #FFB800;
-  --alert-high-bg: #1A0A0A;
-  --alert-high-border: #FF3B3B;
-  --alert-critical-bg: #1A0A0A;
-  --alert-critical-border: #FF3B3B;
+  --color-accent:         var(--accent-default);
+  --color-accent-subtle:  var(--accent-subtle);
+  --color-accent-text:    var(--accent-text);
 
-  /* Text */
-  --text-primary: #F0F0F8;
-  --text-secondary: #8080A0;
-  --text-muted: #4A4A60;
+  --color-safe:     var(--status-safe);
+  --color-warn:     var(--status-warn);
+  --color-alert:    var(--status-alert);
+  --color-critical: var(--status-critical);
+  --color-offline:  var(--status-offline);
 
-  /* Mode ambient colors */
-  --mode-casa: #00D084;
-  --mode-fuera: #FFB800;
-  --mode-noche: #A78BFA;
-  --mode-viaje: #FF3B3B;
-  --mode-off: #4A4A60;
+  --font-family-sans: var(--font-sans);
 
-  /* Shape */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-full: 9999px;
-
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
-
-  /* Keep M3 compat tokens for existing components */
-  --md-primary: #3B82F6;
-  --md-on-primary: #ffffff;
-  --md-primary-container: #1d4ed8;
-  --md-on-primary-container: #dbeafe;
-  --md-surface: #0A0A0F;
-  --md-surface-dim: #0A0A0F;
-  --md-surface-bright: #1A1A24;
-  --md-surface-container-lowest: #07070D;
-  --md-surface-container-low: #12121A;
-  --md-surface-container: #1A1A24;
-  --md-surface-container-high: #23232F;
-  --md-surface-container-highest: #2E2E3E;
-  --md-on-surface: #F0F0F8;
-  --md-on-surface-variant: #8080A0;
-  --md-outline: #23232F;
-  --md-outline-variant: #16161F;
-  --md-error: #FF3B3B;
-  --md-on-error: #ffffff;
-  --md-error-container: #2A0A0A;
-  --md-on-error-container: #FFAAAA;
-  --md-title-lg: 1.375rem;
-  --md-title-md: 1rem;
-  --md-shape-md: 12px;
-  --md-shape-full: 9999px;
-  --md-elevation-1: 0 1px 3px rgba(0,0,0,0.5);
-  --md-elevation-2: 0 4px 12px rgba(0,0,0,0.4);
-  --md-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-
-  /* Fonts */
-  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+  --border-radius-sm:   var(--radius-sm);
+  --border-radius-md:   var(--radius-md);
+  --border-radius-lg:   var(--radius-lg);
+  --border-radius-xl:   var(--radius-xl);
+  --border-radius-full: var(--radius-full);
 }
 
-/* ═══════════════════════════════════════════
-   Global reset
-   ═══════════════════════════════════════════ */
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Global reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root {
   height: 100%;
-  background: var(--bg);
+  background: var(--surface-base);
   color: var(--text-primary);
-  font-family: var(--font-ui);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body { overflow-x: hidden; }
 
-/* ═══════════════════════════════════════════
-   Scrollbar
-   ═══════════════════════════════════════════ */
+/* ── Scrollbar ── */
+* { scrollbar-width: thin; scrollbar-color: var(--surface-float) transparent; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-float); border-radius: var(--radius-full); }
 
-.scrollbar-thin::-webkit-scrollbar { width: 4px; }
-.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--bg-border);
-  border-radius: var(--radius-full);
+/* ── Alert level left-border ribbons ── */
+.ribbon {
+  border-left: 3px solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+.ribbon[data-level="low"]      { border-left-color: var(--status-safe);     background: var(--status-safe-bg); }
+.ribbon[data-level="medium"]   { border-left-color: var(--status-warn);     background: var(--status-warn-bg); }
+.ribbon[data-level="high"]     { border-left-color: var(--status-alert);    background: var(--status-alert-bg); }
+.ribbon[data-level="critical"] { border-left-color: var(--status-critical); background: var(--status-critical-bg); }
+
+/* ── Typing indicator ── */
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40%           { transform: translateY(-4px); opacity: 1; }
 }
 
-/* ═══════════════════════════════════════════
-   Cards
-   ═══════════════════════════════════════════ */
-
-.card {
-  background: var(--bg-card);
-  border: 1px solid var(--bg-border);
-  border-radius: var(--radius-md);
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.card-hover:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--bg-border-bright);
-  cursor: pointer;
-}
-
-/* M3 compat */
-.md-card {
-  background: var(--bg-card);
-  border: 1px solid var(--bg-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.2s ease;
-}
-
-.md-card:hover { box-shadow: var(--shadow-md); }
-.md-card-interactive:hover { box-shadow: var(--shadow-md); cursor: pointer; }
-
-.md-surface {
-  background: var(--bg-elevated);
-  border-radius: var(--radius-md);
-}
-
-/* ═══════════════════════════════════════════
-   Alert level ribbons (left border cards)
-   ═══════════════════════════════════════════ */
-
-.alert-ribbon {
-  border-left: 3px solid var(--alert-none-border);
-  background: var(--alert-none-bg);
-}
-.alert-ribbon[data-level="low"] {
-  border-left-color: var(--alert-low-border);
-  background: var(--alert-low-bg);
-}
-.alert-ribbon[data-level="medium"] {
-  border-left-color: var(--alert-medium-border);
-  background: var(--alert-medium-bg);
-}
-.alert-ribbon[data-level="high"] {
-  border-left-color: var(--alert-high-border);
-  background: var(--alert-high-bg);
-}
-.alert-ribbon[data-level="critical"] {
-  border-left-color: var(--alert-critical-border);
-  background: var(--alert-critical-bg);
-}
-
-/* ═══════════════════════════════════════════
-   Mode ambient backgrounds
-   ═══════════════════════════════════════════ */
-
-.ambient-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  transition: opacity 1s ease;
-}
-
-.ambient-bg::before {
-  content: '';
-  position: absolute;
-  top: -200px;
-  left: -200px;
-  width: 600px;
-  height: 600px;
+.typing-dot {
+  width: 5px; height: 5px;
+  background: var(--text-tertiary);
   border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.04;
-  transition: background 1s ease;
+  display: inline-block;
+  animation: typingBounce 1.2s infinite ease-in-out;
 }
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.30s; }
 
-.ambient-bg[data-mode="casa"]::before  { background: var(--mode-casa); }
-.ambient-bg[data-mode="fuera"]::before { background: var(--mode-fuera); }
-.ambient-bg[data-mode="noche"]::before { background: var(--mode-noche); }
-.ambient-bg[data-mode="viaje"]::before { background: var(--mode-viaje); }
-.ambient-bg[data-mode="off"]::before   { background: var(--mode-off); }
-
-/* ═══════════════════════════════════════════
-   Animations
-   ═══════════════════════════════════════════ */
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulseRing {
-  0%   { transform: scale(1); opacity: 0.7; }
-  100% { transform: scale(2.8); opacity: 0; }
-}
-
+/* ── Skeleton shimmer ── */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  100% { background-position:  200% 0; }
 }
-
-@keyframes typingDot {
-  0%, 80%, 100% { transform: scale(0); opacity: 0; }
-  40%            { transform: scale(1); opacity: 1; }
-}
-
-.animate-fade-in { animation: fadeIn 0.3s ease-out; }
-
-.animate-pulse-ring { animation: pulseRing 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-elevated) 50%, var(--bg-card) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--surface-raised) 25%,
+    var(--surface-overlay) 50%,
+    var(--surface-raised) 75%
+  );
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.6s infinite;
   border-radius: var(--radius-sm);
 }
 
-/* Typing indicator dots */
-.typing-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--text-secondary);
-  border-radius: 50%;
-  display: inline-block;
-  animation: typingDot 1.4s infinite ease-in-out;
+/* ── Pulse ring ── */
+@keyframes pulseRing {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.4); opacity: 0; }
 }
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+.pulse-ring { animation: pulseRing 1.8s cubic-bezier(0.4,0,0.6,1) infinite; }
 
-/* ═══════════════════════════════════════════
-   Chip / Badge
-   ═══════════════════════════════════════════ */
+/* ── Fade in ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp var(--transition-slow) ease-out; }
 
-.md-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  background: var(--bg-elevated);
-  border-radius: var(--radius-full);
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  transition: background 0.2s ease;
-  border: 1px solid var(--bg-border);
+/* ── Mobile bottom nav layout helpers ── */
+.pb-safe-nav {
+  padding-bottom: calc(var(--nav-bottom-h) + env(safe-area-inset-bottom) + 0px);
 }
 
-.md-chip-active {
-  background: var(--color-info);
-  color: white;
-  border-color: transparent;
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: calc(var(--nav-bottom-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border-subtle);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 40;
+  display: flex;
+  align-items: stretch;
 }
 
-.md-divider {
-  height: 1px;
-  background: var(--bg-border);
-  border: none;
-  margin: 8px 0;
+/* ── Recharts overrides — token colors ── */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: var(--surface-overlay) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-md) !important;
 }
+.recharts-cartesian-axis-tick-value { fill: var(--text-tertiary) !important; }

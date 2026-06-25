@@ -13,23 +13,20 @@ interface Message {
 
 const QUICK_QUESTIONS = [
   '¿Hubo algo inusual hoy?',
-  '¿Qué detectó la cámara del balcón?',
   '¿A qué horas hay más actividad?',
+  '¿Qué detectó la cámara del balcón?',
   'Dame un resumen de la semana',
 ]
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [messages, setMessages]           = useState<Message[]>([])
+  const [input, setInput]                 = useState('')
+  const [loading, setLoading]             = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef  = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    loadHistory()
-  }, [])
-
+  useEffect(() => { loadHistory() }, [])
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
@@ -41,8 +38,7 @@ export default function ChatPage() {
       if (res.ok) {
         const data = await res.json()
         setMessages(data.map((m: { id: string; role: string; content: string; model_used: string | null; timestamp: string }) => ({
-          ...m,
-          timestamp: new Date(m.timestamp),
+          ...m, timestamp: new Date(m.timestamp),
         })))
       }
     } catch { /* silent */ }
@@ -59,12 +55,7 @@ export default function ChatPage() {
     if (!text || loading) return
     setInput('')
 
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-    }
+    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: new Date() }
     setMessages((prev) => [...prev, userMsg])
     setLoading(true)
 
@@ -76,80 +67,114 @@ export default function ChatPage() {
       })
       if (res.ok) {
         const data = await res.json()
-        const sheriffMsg: Message = {
+        setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: 'sheriff',
           content: data.response,
           model_used: data.model_used,
           timestamp: new Date(),
-        }
-        setMessages((prev) => [...prev, sheriffMsg])
+        }])
       } else {
         throw new Error(`HTTP ${res.status}`)
       }
     } catch (e) {
-      const errorMsg: Message = {
+      setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
         role: 'sheriff',
         content: `Error al conectar con el Sheriff: ${(e as Error).message}`,
         timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, errorMsg])
+      }])
     }
     setLoading(false)
     inputRef.current?.focus()
   }
 
   return (
-    <div className="max-w-2xl flex flex-col h-[calc(100vh-8rem)]">
+    <div
+      className="max-w-2xl flex flex-col"
+      style={{ height: 'calc(100dvh - 160px)' }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
+      <div
+        className="flex items-center justify-between mb-4 pb-4 shrink-0"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#1A1A2E] border border-[#3B82F6]/30 flex items-center justify-center">
-            <Shield size={20} className="text-[#3B82F6]" />
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent-border)' }}
+          >
+            <Shield size={20} style={{ color: 'var(--accent-text)' }} />
           </div>
           <div>
-            <div className="text-sm font-bold text-white">Sheriff IA</div>
-            <div className="text-[10px] text-[#8080A0] font-mono">Asistente de seguridad</div>
+            <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Sheriff IA</div>
+            <div className="text-[10px] font-mono" style={{ color: 'var(--text-disabled)' }}>
+              Asistente de seguridad
+            </div>
           </div>
         </div>
         {messages.length > 0 && (
           <button
             onClick={clearHistory}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-[#4A4A60] hover:text-[#FF3B3B] hover:bg-[#1A0505] transition-all border border-[#23232F]"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all"
+            style={{
+              color: 'var(--text-tertiary)',
+              border: '1px solid var(--border-subtle)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--status-alert)'
+              e.currentTarget.style.borderColor = 'var(--status-alert-border)'
+              e.currentTarget.style.background = 'var(--status-alert-bg)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--text-tertiary)'
+              e.currentTarget.style.borderColor = 'var(--border-subtle)'
+              e.currentTarget.style.background = 'transparent'
+            }}
           >
-            <Trash2 size={12} />
-            Borrar
+            <Trash2 size={12} /> Borrar
           </button>
         )}
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin space-y-4 pb-4 pr-2">
+      <div className="flex-1 overflow-y-auto space-y-4 pb-3 pr-1 min-h-0">
         {loadingHistory ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
               <div key={i} className={`flex gap-3 ${i % 2 ? 'flex-row-reverse' : ''}`}>
                 <div className="skeleton w-8 h-8 rounded-xl shrink-0" />
-                <div className="skeleton h-16 flex-1 rounded-2xl" />
+                <div className="skeleton h-14 flex-1 rounded-2xl" />
               </div>
             ))}
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-[#1A1A2E] border border-[#3B82F6]/20 flex items-center justify-center">
-              <Shield size={32} className="text-[#3B82F6]" />
+          /* Empty state */
+          <div className="flex flex-col items-center justify-center h-full text-center gap-5">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center"
+              style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent-border)' }}
+            >
+              <Shield size={32} style={{ color: 'var(--accent-text)' }} />
             </div>
             <div>
-              <div className="text-white font-semibold mb-1">Sheriff IA</div>
-              <div className="text-sm text-[#8080A0]">Pregúntame sobre la seguridad de tu hogar</div>
+              <div className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Sheriff IA</div>
+              <div className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                Pregúntame sobre la seguridad de tu hogar
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2 justify-center mt-2">
+            {/* 2×2 quick question grid */}
+            <div className="grid grid-cols-2 gap-2 w-full max-w-sm mt-1">
               {QUICK_QUESTIONS.map((q) => (
                 <button
                   key={q}
                   onClick={() => sendMessage(q)}
-                  className="px-3 py-2 bg-[#12121A] border border-[#23232F] rounded-xl text-xs text-[#8080A0] hover:text-white hover:border-[#3B82F6]/40 transition-all text-left"
+                  className="px-3 py-2.5 rounded-xl text-xs text-left transition-all"
+                  style={{
+                    background: 'var(--surface-raised)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-secondary)',
+                  }}
                 >
                   {q}
                 </button>
@@ -157,79 +182,105 @@ export default function ChatPage() {
             </div>
           </div>
         ) : (
-          <>
-            <AnimatePresence initial={false}>
-              {messages.map((msg) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`flex gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+              >
+                {/* Avatar */}
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 self-end"
+                  style={{
+                    background: msg.role === 'user' ? 'var(--surface-float)' : 'var(--accent-subtle)',
+                    border: `1px solid ${msg.role === 'user' ? 'var(--border-default)' : 'var(--accent-border)'}`,
+                  }}
                 >
+                  {msg.role === 'user' ? (
+                    <span className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>A</span>
+                  ) : (
+                    <Shield size={14} style={{ color: 'var(--accent-text)' }} />
+                  )}
+                </div>
+
+                {/* Bubble */}
+                <div className={`flex-1 max-w-[82%] flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                      msg.role === 'user'
-                        ? 'bg-[#1A2040] border border-[#3B82F6]/30'
-                        : 'bg-[#1A1A2E] border border-[#A78BFA]/30'
-                    }`}
+                    className="px-4 py-3 text-sm leading-relaxed"
+                    style={msg.role === 'user'
+                      ? {
+                          background: 'var(--accent-subtle)',
+                          border: '1px solid var(--accent-border)',
+                          color: 'var(--text-primary)',
+                          borderRadius: '20px 20px 4px 20px',
+                        }
+                      : {
+                          background: 'var(--surface-raised)',
+                          border: '1px solid var(--border-subtle)',
+                          color: 'var(--text-secondary)',
+                          borderRadius: '20px 20px 20px 4px',
+                        }
+                    }
                   >
-                    {msg.role === 'user' ? (
-                      <span className="text-xs text-[#3B82F6] font-bold">A</span>
-                    ) : (
-                      <Shield size={14} className="text-[#A78BFA]" />
+                    {msg.content}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 px-1">
+                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-disabled)' }}>
+                      {msg.timestamp.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {msg.model_used && (
+                      <span className="flex items-center gap-0.5 text-[10px]" style={{ color: 'var(--text-disabled)' }}>
+                        <Brain size={9} />
+                        {msg.model_used.split('-')[1] ?? msg.model_used}
+                      </span>
                     )}
                   </div>
-                  <div className={`flex-1 max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col`}>
-                    <div
-                      className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                        msg.role === 'user'
-                          ? 'bg-[#1A2040] border border-[#3B82F6]/20 text-white rounded-tr-sm'
-                          : 'bg-[#12121A] border border-[#23232F] text-[#E0E0F0] rounded-tl-sm'
-                      }`}
-                    >
-                      {msg.content}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 px-1">
-                      <span className="text-[10px] text-[#3A3A50] font-mono">
-                        {msg.timestamp.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      {msg.model_used && (
-                        <span className="flex items-center gap-0.5 text-[10px] text-[#3A3A50]">
-                          <Brain size={9} />
-                          {msg.model_used.split('-')[1] ?? msg.model_used}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                </div>
+              </motion.div>
+            ))}
 
             {loading && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-                <div className="w-8 h-8 rounded-xl bg-[#1A1A2E] border border-[#A78BFA]/30 flex items-center justify-center shrink-0">
-                  <Shield size={14} className="text-[#A78BFA]" />
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2.5">
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: 'var(--accent-subtle)', border: '1px solid var(--accent-border)' }}
+                >
+                  <Shield size={14} style={{ color: 'var(--accent-text)' }} />
                 </div>
-                <div className="bg-[#12121A] border border-[#23232F] rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
+                <div
+                  className="px-4 py-3 flex items-center gap-1.5"
+                  style={{
+                    background: 'var(--surface-raised)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '20px 20px 20px 4px',
+                  }}
+                >
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                 </div>
               </motion.div>
             )}
-          </>
+          </AnimatePresence>
         )}
         <div ref={bottomRef} />
       </div>
 
-      {/* Quick questions (when there are messages) */}
+      {/* Quick questions strip (when there are messages) */}
       {messages.length > 0 && !loading && (
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin shrink-0">
+        <div className="flex gap-2 overflow-x-auto pb-2 shrink-0">
           {QUICK_QUESTIONS.map((q) => (
             <button
               key={q}
               onClick={() => sendMessage(q)}
-              className="px-3 py-1.5 bg-[#12121A] border border-[#23232F] rounded-xl text-[11px] text-[#8080A0] hover:text-white hover:border-[#3B82F6]/30 transition-all whitespace-nowrap shrink-0"
+              className="px-3 py-1.5 rounded-xl text-[11px] whitespace-nowrap shrink-0 transition-all"
+              style={{
+                background: 'var(--surface-raised)',
+                border: '1px solid var(--border-subtle)',
+                color: 'var(--text-tertiary)',
+              }}
             >
               {q}
             </button>
@@ -237,7 +288,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* Input */}
+      {/* Input bar */}
       <div className="flex gap-2 mt-2 shrink-0">
         <input
           ref={inputRef}
@@ -247,14 +298,22 @@ export default function ChatPage() {
           onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
           placeholder="Pregunta al Sheriff..."
           disabled={loading}
-          className="flex-1 bg-[#12121A] border border-[#23232F] rounded-xl px-4 py-3 text-sm text-white placeholder-[#4A4A60] focus:outline-none focus:border-[#3B82F6]/50 disabled:opacity-50 transition-colors"
+          className="flex-1 px-4 py-3 text-sm rounded-xl outline-none transition-all disabled:opacity-50"
+          style={{
+            background: 'var(--surface-raised)',
+            border: '1px solid var(--border-default)',
+            color: 'var(--text-primary)',
+          }}
+          onFocus={(e) => { e.target.style.borderColor = 'var(--accent-border)' }}
+          onBlur={(e)  => { e.target.style.borderColor = 'var(--border-default)' }}
         />
         <button
           onClick={() => sendMessage()}
           disabled={!input.trim() || loading}
-          className="w-11 h-11 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] disabled:bg-[#23232F] flex items-center justify-center transition-all disabled:cursor-not-allowed"
+          className="w-11 h-11 rounded-xl flex items-center justify-center transition-all disabled:opacity-30"
+          style={{ background: 'var(--accent-default)' }}
         >
-          <Send size={16} className={loading ? 'text-[#4A4A60]' : 'text-white'} />
+          <Send size={16} style={{ color: 'var(--text-primary)' }} />
         </button>
       </div>
     </div>

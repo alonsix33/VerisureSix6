@@ -1,58 +1,95 @@
 import { useStore } from '../store'
 
-const SENSOR_POSITIONS: Record<string, { x: number; y: number }> = {
-  sala: { x: 35, y: 30 },
-  cocina: { x: 35, y: 70 },
-  balcon: { x: 78, y: 45 },
-  entrada: { x: 78, y: 80 },
-}
+const ROOMS = [
+  { id: 'sala',    label: 'Sala',    x: 2,  y: 2,  w: 46, h: 50 },
+  { id: 'cocina',  label: 'Cocina',  x: 2,  y: 54, w: 46, h: 44 },
+  { id: 'balcon',  label: 'Balcón',  x: 50, y: 2,  w: 48, h: 46 },
+  { id: 'entrada', label: 'Entrada', x: 50, y: 50, w: 48, h: 48 },
+]
+
+const SENSORS: { zone: string; x: number; y: number }[] = [
+  { zone: 'sala',    x: 25, y: 27 },
+  { zone: 'cocina',  x: 25, y: 76 },
+  { zone: 'balcon',  x: 74, y: 25 },
+  { zone: 'entrada', x: 74, y: 74 },
+]
+
+const LEGEND = [
+  { label: 'Normal', token: '--map-dot-inactive' },
+  { label: 'Activo', token: '--map-dot-active' },
+  { label: 'Alerta', token: '--map-dot-alert' },
+]
 
 export default function HomeMap() {
   const events = useStore((s) => s.events)
 
   const zoneActivity = new Map<string, number>()
-  events.slice(0, 200).forEach((e) => {
+  events.slice(0, 100).forEach((e) => {
     if (e.zone) zoneActivity.set(e.zone, (zoneActivity.get(e.zone) || 0) + 1)
   })
 
+  const hasAlert = (zone: string) =>
+    events.slice(0, 20).some((e) => e.zone === zone && e.alert_level !== 'none')
+
   return (
-    <div className="md-card relative overflow-hidden">
-      <svg viewBox="0 0 100 100" className="w-full aspect-[4/3] max-h-72">
-        {/* Apartment floor plan */}
-        <rect x="2" y="2" width="96" height="96" fill="none" stroke="var(--md-outline)" strokeWidth="0.5" rx="2" />
-        <line x1="2" y1="55" x2="55" y2="55" stroke="var(--md-outline)" strokeWidth="0.4" />
-        <line x1="55" y1="2" x2="55" y2="55" stroke="var(--md-outline)" strokeWidth="0.4" />
+    <div
+      className="relative overflow-hidden rounded-xl"
+      style={{ background: 'var(--surface-overlay)' }}
+    >
+      <svg viewBox="0 0 100 100" className="w-full aspect-[4/3] max-h-64">
 
-        {/* Room labels */}
-        <text x="28" y="45" textAnchor="middle" fill="var(--md-on-surface-variant)" fontSize="4" opacity="0.6">Sala</text>
-        <text x="28" y="80" textAnchor="middle" fill="var(--md-on-surface-variant)" fontSize="4" opacity="0.6">Cocina</text>
-        <text x="78" y="30" textAnchor="middle" fill="var(--md-on-surface-variant)" fontSize="4" opacity="0.6">Balcón</text>
-        <text x="78" y="65" textAnchor="middle" fill="var(--md-on-surface-variant)" fontSize="4" opacity="0.6">Entrada</text>
+        {ROOMS.map((room) => {
+          const count   = zoneActivity.get(room.id) || 0
+          const active  = count > 0
+          const alertOn = hasAlert(room.id)
 
-        {/* Sensor dots with pulse animation for active zones */}
-        {Object.entries(SENSOR_POSITIONS).map(([zone, pos]) => {
-          const count = zoneActivity.get(zone) || 0
-          const isActive = count > 2
-          const size = Math.min(5, 2.5 + count * 0.4)
+          const fillToken   = alertOn ? '--map-room-alert' : active ? '--map-room-active' : '--map-room-inactive'
+          const strokeToken = alertOn ? '--map-border-alert' : active ? '--map-border-active' : '--map-border-inactive'
+          const textToken   = alertOn ? '--map-text-alert' : active ? '--map-text-active' : '--map-text-inactive'
 
           return (
-            <g key={zone}>
-              {isActive && (
+            <g key={room.id}>
+              <rect
+                x={room.x + 0.5} y={room.y + 0.5}
+                width={room.w - 1} height={room.h - 1}
+                rx="2"
+                style={{ fill: `var(${fillToken})`, stroke: `var(${strokeToken})`, strokeWidth: 0.6 }}
+              />
+              <text
+                x={room.x + room.w / 2}
+                y={room.y + room.h / 2 + 1.5}
+                textAnchor="middle"
+                fontSize="4"
+                fontFamily="Inter, system-ui, sans-serif"
+                style={{ fill: `var(${textToken})` }}
+              >
+                {room.label}
+              </text>
+            </g>
+          )
+        })}
+
+        {SENSORS.map((sensor) => {
+          const count   = zoneActivity.get(sensor.zone) || 0
+          const active  = count > 1
+          const alertOn = hasAlert(sensor.zone)
+
+          const dotToken   = alertOn ? '--map-dot-alert' : active ? '--map-dot-active' : '--map-dot-inactive'
+          const pulseToken = alertOn ? '--map-pulse-alert' : '--map-pulse-active'
+          const ringToken  = alertOn ? '--map-border-alert' : '--map-border-active'
+
+          return (
+            <g key={sensor.zone}>
+              {(active || alertOn) && (
                 <circle
-                  cx={pos.x} cy={pos.y}
-                  r={size + 2}
-                  fill="none"
-                  stroke="#ef4444"
-                  strokeWidth="0.3"
-                  opacity={0.4}
-                  className="animate-pulse-ring"
+                  cx={sensor.x} cy={sensor.y} r="4.5"
+                  style={{ fill: `var(${pulseToken})`, stroke: `var(${ringToken})`, strokeWidth: 0.5 }}
+                  className="pulse-ring"
                 />
               )}
               <circle
-                cx={pos.x} cy={pos.y}
-                r={size}
-                fill={isActive ? '#ef4444' : '#22c55e'}
-                opacity={0.85}
+                cx={sensor.x} cy={sensor.y} r="2"
+                style={{ fill: `var(${dotToken})` }}
               />
             </g>
           )
@@ -60,11 +97,21 @@ export default function HomeMap() {
       </svg>
 
       {/* Legend */}
-      <div className="absolute top-2 right-2 flex gap-2 bg-[var(--md-surface)]/90 px-2 py-1 rounded-full">
-        {['Normal', 'Activo'].map((label) => (
-          <span key={label} className="flex items-center gap-1 text-[10px] text-[var(--md-on-surface-variant)]">
-            <span className={`w-1.5 h-1.5 rounded-full ${label === 'Normal' ? 'bg-green-500' : 'bg-red-500'}`} />
-            {label}
+      <div
+        className="absolute top-2 right-2 flex items-center gap-3 px-2.5 py-1.5 rounded-xl"
+        style={{ background: 'var(--surface-float)' }}
+      >
+        {LEGEND.map((item) => (
+          <span
+            key={item.label}
+            className="flex items-center gap-1 text-[10px]"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ background: `var(${item.token})` }}
+            />
+            {item.label}
           </span>
         ))}
       </div>

@@ -1,27 +1,18 @@
 import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '../store'
-import { Activity, AlertTriangle, Shield, Wifi, WifiOff, Radio, MapPin, Eye } from 'lucide-react'
+import { Activity, AlertTriangle, Shield, Wifi, WifiOff, Radio, Eye } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import { Link } from 'react-router-dom'
 
 const MODE_META = {
-  off:     { label: 'Apagado',  color: '#4A4A60', bg: 'bg-[#12121A]',    desc: 'Sistema inactivo' },
-  monitor: { label: 'Monitor',  color: '#3B82F6', bg: 'bg-[#0A1020]',    desc: 'Solo registra' },
-  casa:    { label: 'Casa',     color: '#00D084', bg: 'bg-[#001A10]',    desc: 'Alguien en casa' },
-  fuera:   { label: 'Fuera',    color: '#FFB800', bg: 'bg-[#1A1100]',    desc: 'Casa vacía' },
-  noche:   { label: 'Noche',    color: '#A78BFA', bg: 'bg-[#100A1A]',    desc: 'Todos durmiendo' },
-  viaje:   { label: 'Viaje',    color: '#FF3B3B', bg: 'bg-[#1A0505]',    desc: 'Máxima alerta 24/7' },
+  off:     { label: 'Apagado',  desc: 'Sistema inactivo' },
+  monitor: { label: 'Monitor',  desc: 'Solo registra' },
+  casa:    { label: 'Casa',     desc: 'Alguien en casa' },
+  fuera:   { label: 'Fuera',    desc: 'Casa vacía' },
+  noche:   { label: 'Noche',    desc: 'Todos durmiendo' },
+  viaje:   { label: 'Viaje',    desc: 'Máxima alerta 24/7' },
 } as const
-
-const ALERT_COLOR: Record<string, string> = {
-  none: '#4A4A60', low: '#00D084', medium: '#FFB800', high: '#FF3B3B', critical: '#FF3B3B',
-}
-
-const EVENT_ICON: Record<string, string> = {
-  motion_detected: '👁', camera_snapshot: '📷', zone_crossed: '🚶',
-  alarm_triggered: '🚨', system_heartbeat: '💓',
-}
 
 export default function Home() {
   const events       = useStore((s) => s.events)
@@ -47,31 +38,31 @@ export default function Home() {
     return e.timestamp?.startsWith(today) && e.alert_level !== 'none'
   }).length
 
-  const recentEvents = events.slice(0, 8)
-  const hourlyData = stats?.by_hour ?? []
+  const recentEvents = events.slice(0, 5)
+  const hourlyData   = stats?.by_hour ?? []
 
   if (loading && events.length === 0) {
     return (
-      <div className="space-y-6 max-w-5xl">
-        <div className="skeleton h-24 w-full rounded-2xl" />
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-          {[...Array(6)].map((_, i) => <div key={i} className="skeleton h-20 rounded-xl" />)}
+      <div className="space-y-4 max-w-4xl">
+        <div className="skeleton h-28 w-full rounded-2xl" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[...Array(4)].map((_, i) => <div key={i} className="skeleton h-24 rounded-xl" />)}
         </div>
-        <div className="skeleton h-48 rounded-2xl" />
+        <div className="skeleton h-44 rounded-2xl" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-4 max-w-4xl">
 
-      {/* ── Hero status bar ── */}
+      {/* ── Hero status card ── */}
       <motion.div
         layout
-        className="rounded-2xl p-5 border"
+        className="rounded-2xl p-5"
         style={{
-          background: `linear-gradient(135deg, ${meta.color}10 0%, transparent 60%)`,
-          borderColor: `${meta.color}30`,
+          background: `var(--mode-${mode}-bg)`,
+          border: `1px solid var(--mode-${mode}-border)`,
         }}
       >
         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -79,37 +70,56 @@ export default function Home() {
             <div className="relative">
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                style={{ background: `${meta.color}20`, border: `1px solid ${meta.color}40` }}
+                style={{
+                  background: `var(--mode-${mode}-bg)`,
+                  border: `1px solid var(--mode-${mode}-border)`,
+                }}
               >
-                <Shield size={28} style={{ color: meta.color }} />
+                <Shield size={28} style={{ color: `var(--mode-${mode})` }} />
               </div>
               {wsConnected && (
                 <div className="absolute -top-1 -right-1 w-3 h-3">
-                  <span className="absolute inline-flex h-full w-full rounded-full animate-ping opacity-75" style={{ background: meta.color }} />
-                  <span className="relative inline-flex rounded-full h-3 w-3" style={{ background: meta.color }} />
+                  <span
+                    className="absolute inline-flex h-full w-full rounded-full animate-ping opacity-60"
+                    style={{ background: `var(--mode-${mode})` }}
+                  />
+                  <span
+                    className="relative inline-flex rounded-full h-3 w-3"
+                    style={{ background: `var(--mode-${mode})` }}
+                  />
                 </div>
               )}
             </div>
             <div>
-              <div className="text-xs text-[#8080A0] uppercase tracking-widest font-mono mb-1">Modo activo</div>
-              <div className="text-3xl font-black uppercase tracking-tight" style={{ color: meta.color }}>
+              <div
+                className="text-[11px] uppercase tracking-widest font-mono mb-1"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                Modo activo
+              </div>
+              <div
+                className="text-3xl font-black uppercase tracking-tight"
+                style={{ color: `var(--mode-${mode})` }}
+              >
                 {meta.label}
               </div>
-              <div className="text-sm text-[#8080A0] mt-0.5">{meta.desc}</div>
+              <div className="text-sm mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                {meta.desc}
+              </div>
             </div>
           </div>
 
-          {/* Quick mode switcher */}
-          <div className="flex gap-2 flex-wrap">
+          {/* Mode switcher */}
+          <div className="flex gap-1.5 flex-wrap">
             {(Object.entries(MODE_META) as [string, typeof MODE_META.off][]).map(([m, v]) => (
               <button
                 key={m}
                 onClick={() => updateMode(m)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-all"
                 style={{
-                  background: m === mode ? `${v.color}25` : 'transparent',
-                  color: m === mode ? v.color : '#4A4A60',
-                  border: `1px solid ${m === mode ? v.color + '40' : '#23232F'}`,
+                  background: m === mode ? `var(--mode-${m}-bg)` : 'transparent',
+                  color: m === mode ? `var(--mode-${m})` : 'var(--text-disabled)',
+                  border: `1px solid ${m === mode ? `var(--mode-${m}-border)` : 'var(--border-subtle)'}`,
                 }}
               >
                 {v.label}
@@ -119,145 +129,187 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* ── Stats row ── */}
+      {/* ── Stats 2×2 grid ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           {
             label: 'Eventos hoy',
             value: stats?.today.total_events ?? events.length,
             icon: Activity,
-            color: '#3B82F6',
+            tokenColor: '--accent-text',
           },
           {
             label: 'Alertas hoy',
             value: todayAlerts,
             icon: AlertTriangle,
-            color: todayAlerts > 0 ? '#FFB800' : '#4A4A60',
+            tokenColor: todayAlerts > 0 ? '--status-warn' : '--text-disabled',
           },
           {
             label: 'Dispositivos',
             value: devices.filter((d) => d.enabled).length,
             icon: Radio,
-            color: '#A78BFA',
+            tokenColor: '--text-secondary',
           },
           {
             label: 'Estado',
             value: wsConnected ? 'En vivo' : 'Offline',
             icon: wsConnected ? Wifi : WifiOff,
-            color: wsConnected ? '#00D084' : '#FF3B3B',
+            tokenColor: wsConnected ? '--status-safe' : '--status-alert',
             isText: true,
           },
         ].map((stat) => (
           <motion.div
             key={stat.label}
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-[#12121A] border border-[#1A1A24] rounded-xl p-4"
+            className="rounded-xl p-4 flex flex-col gap-3"
+            style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)' }}
           >
-            <div className="flex items-center gap-2 mb-2">
-              <stat.icon size={14} style={{ color: stat.color }} />
-              <span className="text-xs text-[#8080A0]">{stat.label}</span>
+            <div className="flex items-center gap-2">
+              <stat.icon size={13} style={{ color: `var(${stat.tokenColor})` }} />
+              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{stat.label}</span>
             </div>
-            <div className="text-2xl font-black" style={{ color: stat.color }}>
+            <div
+              className={`font-black ${stat.isText ? 'text-xl' : 'text-2xl'}`}
+              style={{ color: `var(${stat.tokenColor})` }}
+            >
               {stat.value}
             </div>
           </motion.div>
         ))}
       </div>
 
-      {/* ── Hourly activity chart + devices ── */}
+      {/* ── Chart + Devices ── */}
       <div className="grid md:grid-cols-2 gap-4">
-        {/* Chart */}
-        <div className="bg-[#12121A] border border-[#1A1A24] rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="text-sm font-semibold text-white">Actividad — últimas 24h</div>
-              <div className="text-xs text-[#8080A0]">eventos por hora</div>
-            </div>
-            <div className="text-xs font-mono text-[#3B82F6]">
+
+        {/* Activity chart */}
+        <div
+          className="rounded-2xl p-5"
+          style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)' }}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Actividad 24h
+            </span>
+            <span className="text-xs font-mono" style={{ color: 'var(--accent-text)' }}>
               {stats?.week.total_events ?? 0} esta semana
-            </div>
+            </span>
           </div>
+          <div className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>eventos por hora</div>
+
           {hourlyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={120}>
+            <ResponsiveContainer width="100%" height={80}>
               <AreaChart data={hourlyData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="actGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#3B82F6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                  <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="var(--accent-default)" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="var(--accent-default)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <Tooltip
-                  contentStyle={{ background: '#1A1A24', border: '1px solid #23232F', borderRadius: 8, fontSize: 12 }}
-                  itemStyle={{ color: '#F0F0F8' }}
+                  contentStyle={{
+                    background: 'var(--surface-overlay)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: 11,
+                    color: 'var(--text-primary)',
+                  }}
+                  itemStyle={{ color: 'var(--accent-text)' }}
                   labelFormatter={(v) => `${v}:00h`}
                 />
                 <Area
-                  type="monotone" dataKey="count" stroke="#3B82F6"
-                  fill="url(#actGrad)" strokeWidth={2}
+                  type="monotone" dataKey="count"
+                  stroke="var(--accent-default)"
+                  fill="url(#chartGrad)"
+                  strokeWidth={2}
+                  dot={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[120px] flex items-center justify-center text-xs text-[#4A4A60]">
+            <div
+              className="h-20 flex items-center justify-center text-xs"
+              style={{ color: 'var(--text-disabled)' }}
+            >
               Sin datos aún
             </div>
           )}
         </div>
 
-        {/* Device tiles */}
-        <div className="bg-[#12121A] border border-[#1A1A24] rounded-2xl p-5">
+        {/* Device list */}
+        <div
+          className="rounded-2xl p-5"
+          style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)' }}
+        >
           <div className="flex items-center justify-between mb-4">
-            <div className="text-sm font-semibold text-white">Dispositivos</div>
-            <Link to="/cameras" className="text-xs text-[#3B82F6] hover:text-[#60A5FA]">Ver todos →</Link>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Dispositivos
+            </span>
+            <Link
+              to="/cameras"
+              className="text-xs transition-colors"
+              style={{ color: 'var(--accent-text)' }}
+            >
+              Ver todos →
+            </Link>
           </div>
           <div className="space-y-2">
-            {devices.length === 0 ? (
-              <div className="text-xs text-[#4A4A60] text-center py-6">
+            {devices.slice(0, 4).map((device) => {
+              const lastEvent = events.find((e) => e.device_id === device.device_id)
+              const hasAlert  = lastEvent && lastEvent.alert_level !== 'none'
+              return (
+                <div
+                  key={device.id}
+                  className="flex items-center gap-3 rounded-xl p-3"
+                  style={{ background: 'var(--surface-overlay)' }}
+                >
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                    style={{
+                      background: hasAlert ? 'var(--status-warn-bg)' : 'var(--surface-float)',
+                    }}
+                  >
+                    <Eye size={14} style={{ color: hasAlert ? 'var(--status-warn)' : 'var(--text-tertiary)' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                      {device.name}
+                    </div>
+                    <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                      {device.zone ?? 'sin zona'}
+                    </div>
+                  </div>
+                  <div
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ background: device.enabled ? 'var(--status-safe)' : 'var(--text-disabled)' }}
+                  />
+                </div>
+              )
+            })}
+            {devices.length === 0 && (
+              <div className="text-xs text-center py-4" style={{ color: 'var(--text-disabled)' }}>
                 Cargando dispositivos...
               </div>
-            ) : (
-              devices.slice(0, 4).map((device) => {
-                const lastEvent = events.find((e) => e.device_id === device.device_id)
-                const alertColor = ALERT_COLOR[lastEvent?.alert_level ?? 'none']
-                return (
-                  <div key={device.id} className="flex items-center gap-3 bg-[#16161F] rounded-xl p-3">
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
-                      style={{ background: `${alertColor}20` }}
-                    >
-                      {device.device_type === 'tapo_camera' ? '📷' : '👁'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-white truncate">{device.name}</div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <MapPin size={10} className="text-[#4A4A60]" />
-                        <span className="text-[10px] text-[#4A4A60]">{device.zone ?? 'sin zona'}</span>
-                      </div>
-                    </div>
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{ background: device.enabled ? '#00D084' : '#4A4A60' }}
-                    />
-                  </div>
-                )
-              })
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Recent events feed ── */}
+      {/* ── Recent events ── */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-semibold text-white">Actividad reciente</div>
-          <Link to="/timeline" className="text-xs text-[#3B82F6] hover:text-[#60A5FA]">Ver todo →</Link>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Actividad reciente
+          </span>
+          <Link to="/timeline" className="text-xs" style={{ color: 'var(--accent-text)' }}>
+            Ver todo →
+          </Link>
         </div>
         <div className="space-y-2">
           <AnimatePresence initial={false}>
             {recentEvents.length === 0 ? (
-              <div className="text-center py-8 text-[#4A4A60] text-sm">
-                Sin eventos aún. {config ? 'El Sheriff está monitoreando.' : 'Cargando...'}
+              <div className="text-center py-8 text-sm" style={{ color: 'var(--text-disabled)' }}>
+                {config ? 'Sheriff monitoreando. Sin eventos recientes.' : 'Cargando...'}
               </div>
             ) : (
               recentEvents.map((event, idx) => {
@@ -265,18 +317,23 @@ export default function Home() {
                 return (
                   <motion.div
                     key={event.id}
-                    initial={{ opacity: 0, x: -12 }}
+                    initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.03 }}
-                    className="alert-ribbon rounded-r-xl rounded-l-sm border border-[#1A1A24] border-l-0 p-3 flex items-center gap-3"
+                    transition={{ delay: idx * 0.04 }}
+                    className="ribbon rounded-r-xl rounded-l-sm p-3 flex items-center gap-3"
                     data-level={level}
                   >
-                    <span className="text-base">{EVENT_ICON[event.event_type] ?? '📡'}</span>
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ background: 'var(--surface-overlay)' }}
+                    >
+                      <Eye size={15} style={{ color: `var(--level-${level})` }} />
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-white truncate">
+                      <div className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                         {event.device_name ?? event.device_id}
                       </div>
-                      <div className="text-[10px] text-[#8080A0] mt-0.5">
+                      <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
                         {event.event_type.replace(/_/g, ' ')} · {event.zone ?? '—'}
                       </div>
                     </div>
@@ -284,12 +341,15 @@ export default function Home() {
                       {level !== 'none' && (
                         <div
                           className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full mb-1"
-                          style={{ background: `${ALERT_COLOR[level]}20`, color: ALERT_COLOR[level] }}
+                          style={{
+                            background: `var(--level-${level}-bg)`,
+                            color: `var(--level-${level})`,
+                          }}
                         >
                           {level}
                         </div>
                       )}
-                      <div className="text-[10px] text-[#4A4A60] font-mono">
+                      <div className="text-[10px] font-mono" style={{ color: 'var(--text-disabled)' }}>
                         {new Date(event.timestamp).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
@@ -301,29 +361,56 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── Zones by activity ── */}
+      {/* ── Zone bars ── */}
       {stats?.by_zone && stats.by_zone.length > 0 && (
-        <div className="bg-[#12121A] border border-[#1A1A24] rounded-2xl p-5">
-          <div className="text-sm font-semibold text-white mb-4">
-            <Eye size={14} className="inline mr-2 text-[#3B82F6]" />
-            Zonas más activas — últimas 24h
+        <div
+          className="rounded-2xl p-5"
+          style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)' }}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Eye size={14} style={{ color: 'var(--accent-text)' }} />
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Zonas — últimas 24h
+            </span>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {stats.by_zone.slice(0, 5).map((z) => {
               const max = stats.by_zone[0]?.count ?? 1
               const pct = Math.round((z.count / max) * 100)
+              const isActive = pct > 60
+              const isWarn   = pct > 80
               return (
                 <div key={z.zone} className="flex items-center gap-3">
-                  <div className="text-xs text-[#8080A0] w-24 truncate capitalize">{z.zone}</div>
-                  <div className="flex-1 h-2 bg-[#1A1A24] rounded-full overflow-hidden">
+                  <div
+                    className="text-xs w-24 truncate capitalize"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    {z.zone}
+                  </div>
+                  <div
+                    className="flex-1 h-1.5 rounded-full overflow-hidden"
+                    style={{ background: 'var(--surface-float)' }}
+                  >
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${pct}%` }}
-                      transition={{ duration: 0.6, ease: 'easeOut' }}
-                      className="h-full bg-[#3B82F6] rounded-full"
+                      transition={{ duration: 0.7, ease: 'easeOut' }}
+                      className="h-full rounded-full"
+                      style={{
+                        background: isWarn
+                          ? 'var(--status-warn)'
+                          : isActive
+                          ? 'var(--accent-default)'
+                          : 'var(--border-strong)',
+                      }}
                     />
                   </div>
-                  <div className="text-xs font-mono text-[#8080A0] w-6 text-right">{z.count}</div>
+                  <div
+                    className="text-xs font-mono w-6 text-right"
+                    style={{ color: 'var(--text-tertiary)' }}
+                  >
+                    {z.count}
+                  </div>
                 </div>
               )
             })}

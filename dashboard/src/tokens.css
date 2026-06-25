@@ -1,0 +1,149 @@
+/* Sheriff Home — Design Tokens
+   Single source of truth. No hex values in components. */
+
+:root {
+  /* ── Surfaces ── */
+  --surface-base:    #111117;
+  --surface-raised:  #18181F;
+  --surface-overlay: #1F1F28;
+  --surface-float:   #262630;
+  --surface-hover:   #2E2E3A;
+
+  /* ── Borders ── */
+  --border-subtle:  rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.10);
+  --border-strong:  rgba(255,255,255,0.18);
+
+  /* ── Text ── */
+  --text-primary:   rgba(255,255,255,0.95);
+  --text-secondary: rgba(255,255,255,0.60);
+  --text-tertiary:  rgba(255,255,255,0.35);
+  --text-disabled:  rgba(255,255,255,0.20);
+
+  /* ── Accent — violeta desaturado ── */
+  --accent-default: #7C6FCD;
+  --accent-subtle:  rgba(124,111,205,0.12);
+  --accent-border:  rgba(124,111,205,0.30);
+  --accent-text:    #A89FE0;
+
+  /* ── Status semántico ── */
+  --status-safe:          #34D399;
+  --status-safe-bg:       rgba(52,211,153,0.10);
+  --status-safe-border:   rgba(52,211,153,0.25);
+
+  --status-warn:          #FBBF24;
+  --status-warn-bg:       rgba(251,191,36,0.10);
+  --status-warn-border:   rgba(251,191,36,0.25);
+
+  --status-alert:         #F87171;
+  --status-alert-bg:      rgba(248,113,113,0.10);
+  --status-alert-border:  rgba(248,113,113,0.25);
+
+  --status-critical:        #FF4444;
+  --status-critical-bg:     rgba(255,68,68,0.12);
+  --status-critical-border: rgba(255,68,68,0.30);
+
+  --status-offline:        #6B7280;
+  --status-offline-bg:     rgba(107,114,128,0.10);
+  --status-offline-border: rgba(107,114,128,0.20);
+
+  /* ── Modos Sheriff — color principal ── */
+  --mode-off:    #6B7280;
+  --mode-monitor:#818CF8;
+  --mode-casa:   #34D399;
+  --mode-fuera:  #FBBF24;
+  --mode-noche:  #818CF8;
+  --mode-viaje:  #F87171;
+
+  /* ── Modos Sheriff — fondos y bordes (hero card) ── */
+  --mode-off-bg:       rgba(107,114,128,0.08);
+  --mode-off-border:   rgba(107,114,128,0.20);
+  --mode-monitor-bg:   rgba(129,140,248,0.08);
+  --mode-monitor-border: rgba(129,140,248,0.20);
+  --mode-casa-bg:      rgba(52,211,153,0.08);
+  --mode-casa-border:  rgba(52,211,153,0.20);
+  --mode-fuera-bg:     rgba(251,191,36,0.08);
+  --mode-fuera-border: rgba(251,191,36,0.20);
+  --mode-noche-bg:     rgba(129,140,248,0.08);
+  --mode-noche-border: rgba(129,140,248,0.20);
+  --mode-viaje-bg:     rgba(248,113,113,0.08);
+  --mode-viaje-border: rgba(248,113,113,0.20);
+
+  /* ── Nivel de alerta — alias para uso dinámico ── */
+  --level-none:        var(--status-offline);
+  --level-low:         var(--status-safe);
+  --level-medium:      var(--status-warn);
+  --level-high:        var(--status-alert);
+  --level-critical:    var(--status-critical);
+  --level-none-bg:     var(--status-offline-bg);
+  --level-low-bg:      var(--status-safe-bg);
+  --level-medium-bg:   var(--status-warn-bg);
+  --level-high-bg:     var(--status-alert-bg);
+  --level-critical-bg: var(--status-critical-bg);
+  --level-none-border:     var(--status-offline-border);
+  --level-low-border:      var(--status-safe-border);
+  --level-medium-border:   var(--status-warn-border);
+  --level-high-border:     var(--status-alert-border);
+  --level-critical-border: var(--status-critical-border);
+
+  /* ── Mapa del hogar (SVG) ── */
+  --map-room-inactive:     rgba(255,255,255,0.02);
+  --map-room-active:       var(--accent-subtle);
+  --map-room-alert:        var(--status-alert-bg);
+  --map-border-inactive:   var(--border-subtle);
+  --map-border-active:     var(--accent-border);
+  --map-border-alert:      var(--status-alert-border);
+  --map-text-inactive:     var(--text-disabled);
+  --map-text-active:       var(--accent-text);
+  --map-text-alert:        var(--status-alert);
+  --map-dot-inactive:      var(--text-disabled);
+  --map-dot-active:        var(--accent-default);
+  --map-dot-alert:         var(--status-alert);
+  --map-pulse-active:      var(--accent-subtle);
+  --map-pulse-alert:       var(--status-alert-bg);
+
+  /* ── Navegación ── */
+  --nav-bottom-h: 64px;
+
+  /* ── Tipografía ── */
+  --font-sans: 'Inter', system-ui, sans-serif;
+
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.25rem;
+  --text-2xl:  1.5rem;
+  --text-3xl:  1.875rem;
+
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ── Espaciado ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* ── Radios ── */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-xl:   18px;
+  --radius-full: 9999px;
+
+  /* ── Transiciones ── */
+  --transition-fast: 120ms ease;
+  --transition-base: 180ms ease;
+  --transition-slow: 280ms ease;
+
+  /* ── Sombras ── */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.35);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.45);
+}
