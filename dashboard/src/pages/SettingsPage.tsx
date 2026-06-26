@@ -1,8 +1,69 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
 import { useStore } from '../store'
 import { Shield, Server, Bell, Key, Info, ExternalLink } from 'lucide-react'
 import { API } from '../store'
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 10, paddingLeft: 2 }}>
+      {children}
+    </div>
+  )
+}
+
+function Row({
+  icon: Icon,
+  iconColor = '--text-tertiary',
+  label,
+  value,
+  valueOk,
+  last = false,
+  action,
+}: {
+  icon?: React.ElementType
+  iconColor?: string
+  label: string
+  value?: string
+  valueOk?: boolean | null
+  last?: boolean
+  action?: React.ReactNode
+}) {
+  const valueColor = valueOk === true
+    ? 'var(--status-safe)'
+    : valueOk === false
+    ? 'var(--status-alert)'
+    : 'var(--text-secondary)'
+
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 14,
+        padding: '15px 20px', minHeight: 60,
+        borderBottom: last ? 'none' : '1px solid var(--border-subtle)',
+      }}
+    >
+      {Icon && (
+        <div style={{
+          width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--surface-overlay)',
+        }}>
+          <Icon size={16} style={{ color: `var(${iconColor})` }} />
+        </div>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 15, fontWeight: 400, color: 'var(--text-primary)' }}>{label}</span>
+      </div>
+      {action ?? (
+        value !== undefined && (
+          <span style={{ fontSize: 13, fontFamily: 'monospace', color: valueColor, textAlign: 'right', maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {value}
+          </span>
+        )
+      )}
+    </div>
+  )
+}
 
 export default function SettingsPage() {
   const health        = useStore((s) => s.health)
@@ -23,10 +84,7 @@ export default function SettingsPage() {
   async function fetchVapidKey() {
     try {
       const res = await fetch(`${API}/api/v1/push/vapid-key`)
-      if (res.ok) {
-        const data = await res.json()
-        setVapidKey(data.public_key ?? '')
-      }
+      if (res.ok) { const d = await res.json(); setVapidKey(d.public_key ?? '') }
     } catch { /* silent */ }
   }
 
@@ -37,16 +95,13 @@ export default function SettingsPage() {
       const permission = await Notification.requestPermission()
       setPushPermission(permission)
       if (permission !== 'granted') return
-
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
       })
-
       await fetch(`${API}/api/v1/push/subscribe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           endpoint: sub.endpoint,
           keys: {
@@ -56,205 +111,134 @@ export default function SettingsPage() {
           device_label: navigator.userAgent.slice(0, 50),
         }),
       })
-    } catch (e) {
-      console.error('Push subscription failed:', e)
-    }
+    } catch (e) { console.error('Push error:', e) }
     setRequestingPush(false)
   }
 
-  function urlBase64ToUint8Array(base64String: string) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4)
-    const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  function urlBase64ToUint8Array(b64: string) {
+    const padding = '='.repeat((4 - b64.length % 4) % 4)
+    const base64  = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/')
     const raw     = window.atob(base64)
-    return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)))
+    return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)))
   }
-
-  type Section = {
-    icon: typeof Shield
-    tokenColor: string
-    title: string
-    items?: { label: string; value: string; ok?: boolean }[]
-    custom?: React.ReactNode
-  }
-
-  const sections: Section[] = [
-    {
-      icon: Shield,
-      tokenColor: '--accent-text',
-      title: 'Sheriff IA',
-      items: [
-        { label: 'Modo actual',        value: config?.mode?.toUpperCase() ?? '—' },
-        { label: 'Claude disponible',  value: sheriffStatus?.claude_available ? 'Sí ✓' : 'No — configurar ANTHROPIC_API_KEY', ok: sheriffStatus?.claude_available },
-        { label: 'OpenAI disponible',  value: sheriffStatus?.openai_available ? 'Sí ✓' : 'No — configurar OPENAI_API_KEY',  ok: sheriffStatus?.openai_available },
-        { label: 'Cooldown',           value: `${config?.cooldown_minutes ?? '—'} min` },
-        { label: 'Escalación',         value: config?.escalation_enabled ? 'Activada' : 'Desactivada' },
-      ],
-    },
-    {
-      icon: Server,
-      tokenColor: '--text-secondary',
-      title: 'Sistema',
-      items: [
-        { label: 'Versión backend',  value: health?.version ?? '—' },
-        { label: 'Modo sensores',    value: health?.mock_sensors ? 'MOCK (simulación)' : 'LIVE (hardware real)', ok: !health?.mock_sensors },
-        { label: 'RF service',       value: (health?.services?.rf as { running?: boolean })?.running ? 'Activo' : 'Inactivo', ok: (health?.services?.rf as { running?: boolean })?.running },
-        { label: 'Tapo service',     value: (health?.services?.tapo as { running?: boolean })?.running ? 'Activo' : 'Inactivo', ok: (health?.services?.tapo as { running?: boolean })?.running },
-        { label: 'IP Orange Pi',     value: '192.168.68.100' },
-      ],
-    },
-    {
-      icon: Bell,
-      tokenColor: '--status-warn',
-      title: 'Notificaciones Push',
-      custom: (
-        <div className="space-y-3">
-          {[
-            {
-              label: 'Soporte Web Push',
-              value: pushSupported ? 'Soportado' : 'No soportado',
-              ok: pushSupported,
-            },
-            {
-              label: 'Permiso actual',
-              value: pushPermission,
-              ok: pushPermission === 'granted',
-              warn: pushPermission === 'default',
-            },
-            {
-              label: 'VAPID configurado',
-              value: vapidKey ? 'Sí ✓' : 'No — configurar VAPID_PUBLIC_KEY',
-              ok: !!vapidKey,
-            },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between">
-              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
-              <span
-                className="text-xs font-mono"
-                style={{
-                  color: item.ok
-                    ? 'var(--status-safe)'
-                    : 'warn' in item && item.warn
-                    ? 'var(--status-warn)'
-                    : 'var(--status-alert)',
-                }}
-              >
-                {item.value}
-              </span>
-            </div>
-          ))}
-          {pushSupported && pushPermission !== 'granted' && vapidKey && (
-            <button
-              onClick={enablePush}
-              disabled={requestingPush}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
-              style={{ background: 'var(--status-warn)', color: 'var(--surface-base)' }}
-            >
-              {requestingPush ? 'Configurando...' : 'Activar notificaciones push'}
-            </button>
-          )}
-          {pushPermission === 'granted' && (
-            <div className="text-xs text-center" style={{ color: 'var(--status-safe)' }}>
-              ✓ Notificaciones push activas
-            </div>
-          )}
-          {!pushSupported && (
-            <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>
-              iOS: instala desde Safari → Compartir → Añadir a pantalla de inicio (requiere iOS 16.4+).
-            </p>
-          )}
-        </div>
-      ),
-    },
-    {
-      icon: Key,
-      tokenColor: '--status-safe',
-      title: 'Variables de entorno',
-      items: [
-        { label: 'ANTHROPIC_API_KEY', value: sheriffStatus?.claude_available ? '••••••••' : 'No configurada', ok: sheriffStatus?.claude_available },
-        { label: 'OPENAI_API_KEY',    value: sheriffStatus?.openai_available ? '••••••••' : 'No configurada',  ok: sheriffStatus?.openai_available },
-        { label: 'VAPID_PUBLIC_KEY',  value: vapidKey ? '••••••••' : 'No configurada', ok: !!vapidKey },
-        { label: 'MOCK_SENSORS',      value: health?.mock_sensors ? 'true' : 'false' },
-      ],
-    },
-  ]
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 36 }}>
+
+      {/* Header */}
       <div>
-        <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Ajustes</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-          Configuración del sistema Sheriff Home
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: 4 }}>
+          Ajustes
+        </h1>
+        <p style={{ fontSize: 14, color: 'var(--text-tertiary)' }}>
+          Configuración del sistema
         </p>
       </div>
 
-      {sections.map((section, idx) => (
-        <motion.div
-          key={section.title}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: idx * 0.07 }}
-          className="rounded-2xl p-5"
-          style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)' }}
-        >
-          <div
-            className="flex items-center gap-2 mb-4 pb-3"
-            style={{ borderBottom: '1px solid var(--border-subtle)' }}
-          >
-            <section.icon size={15} style={{ color: `var(${section.tokenColor})` }} />
-            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {section.title}
-            </span>
-          </div>
-
-          {section.custom ?? (
-            <div className="space-y-3">
-              {section.items?.map((item) => (
-                <div key={item.label} className="flex items-center justify-between gap-4">
-                  <span className="text-xs shrink-0" style={{ color: 'var(--text-tertiary)' }}>
-                    {item.label}
-                  </span>
-                  <span
-                    className="text-xs font-mono text-right truncate max-w-[55%]"
-                    style={{
-                      color: item.ok === true
-                        ? 'var(--status-safe)'
-                        : item.ok === false
-                        ? 'var(--status-alert)'
-                        : 'var(--text-primary)',
-                    }}
-                  >
-                    {item.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </motion.div>
-      ))}
-
-      {/* About */}
-      <div
-        className="rounded-2xl p-5"
-        style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)' }}
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <Info size={14} style={{ color: 'var(--text-disabled)' }} />
-          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Acerca de</span>
-        </div>
-        <div className="space-y-1.5 text-xs" style={{ color: 'var(--text-disabled)' }}>
-          <div>Sheriff Home v0.2.0 — Sistema de seguridad hogareña con IA</div>
-          <div>Alonso Javier · Lima, Perú · 2026</div>
-          <a
-            href="https://github.com/alonsix33/VerisureSix6"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 mt-2 transition-colors"
-            style={{ color: 'var(--accent-text)' }}
-          >
-            GitHub <ExternalLink size={10} />
-          </a>
+      {/* Sheriff IA */}
+      <div>
+        <SectionLabel>Sheriff IA</SectionLabel>
+        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 18, overflow: 'hidden' }}>
+          <Row icon={Shield} iconColor="--accent-text" label="Modo actual" value={config?.mode?.toUpperCase() ?? '—'} />
+          <Row icon={Shield} label="Claude" value={sheriffStatus?.claude_available ? 'Disponible ✓' : 'Sin API key'} valueOk={sheriffStatus?.claude_available} />
+          <Row icon={Shield} label="OpenAI" value={sheriffStatus?.openai_available ? 'Disponible ✓' : 'Sin API key'} valueOk={sheriffStatus?.openai_available} />
+          <Row label="Cooldown" value={`${config?.cooldown_minutes ?? '—'} min`} />
+          <Row label="Escalación" value={config?.escalation_enabled ? 'Activada' : 'Desactivada'} last />
         </div>
       </div>
+
+      {/* Sistema */}
+      <div>
+        <SectionLabel>Sistema</SectionLabel>
+        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 18, overflow: 'hidden' }}>
+          <Row icon={Server} iconColor="--text-secondary" label="Versión backend" value={health?.version ?? '—'} />
+          <Row label="Sensores" value={health?.mock_sensors ? 'MOCK (simulación)' : 'LIVE (hardware)'} valueOk={!health?.mock_sensors} />
+          <Row label="RF service" value={(health?.services?.rf as { running?: boolean })?.running ? 'Activo' : 'Inactivo'} valueOk={(health?.services?.rf as { running?: boolean })?.running} />
+          <Row label="Tapo service" value={(health?.services?.tapo as { running?: boolean })?.running ? 'Activo' : 'Inactivo'} valueOk={(health?.services?.tapo as { running?: boolean })?.running} />
+          <Row label="Orange Pi" value="192.168.68.100" last />
+        </div>
+      </div>
+
+      {/* Variables de entorno */}
+      <div>
+        <SectionLabel>Credenciales</SectionLabel>
+        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 18, overflow: 'hidden' }}>
+          <Row icon={Key} iconColor="--status-safe" label="ANTHROPIC_API_KEY" value={sheriffStatus?.claude_available ? '••••••••' : 'No configurada'} valueOk={sheriffStatus?.claude_available} />
+          <Row label="OPENAI_API_KEY" value={sheriffStatus?.openai_available ? '••••••••' : 'No configurada'} valueOk={sheriffStatus?.openai_available} />
+          <Row label="VAPID_PUBLIC_KEY" value={vapidKey ? '••••••••' : 'No configurada'} valueOk={!!vapidKey} />
+          <Row label="MOCK_SENSORS" value={health?.mock_sensors ? 'true' : 'false'} last />
+        </div>
+      </div>
+
+      {/* Notificaciones Push */}
+      <div>
+        <SectionLabel>Notificaciones Push</SectionLabel>
+        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 18, overflow: 'hidden' }}>
+          <Row
+            icon={Bell} iconColor="--status-warn"
+            label="Soporte Web Push"
+            value={pushSupported ? 'Soportado' : 'No soportado'}
+            valueOk={pushSupported}
+          />
+          <Row
+            label="Permiso"
+            value={pushPermission}
+            valueOk={pushPermission === 'granted' ? true : pushPermission === 'denied' ? false : null}
+          />
+          <Row
+            label="VAPID key"
+            value={vapidKey ? 'Configurada ✓' : 'No configurada'}
+            valueOk={!!vapidKey}
+            last={!(pushSupported && pushPermission !== 'granted' && vapidKey)}
+          />
+          {pushSupported && pushPermission !== 'granted' && vapidKey && (
+            <div style={{ padding: '16px 20px' }}>
+              <button
+                onClick={enablePush}
+                disabled={requestingPush}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: 16, cursor: 'pointer',
+                  fontSize: 15, fontWeight: 600,
+                  background: 'var(--status-warn)', color: 'var(--surface-base)',
+                  opacity: requestingPush ? 0.5 : 1,
+                }}
+              >
+                {requestingPush ? 'Configurando...' : 'Activar notificaciones push'}
+              </button>
+            </div>
+          )}
+          {pushPermission === 'granted' && (
+            <div style={{ padding: '12px 20px', textAlign: 'center', fontSize: 13, color: 'var(--status-safe)' }}>
+              ✓ Notificaciones activas
+            </div>
+          )}
+        </div>
+        {!pushSupported && (
+          <div style={{ marginTop: 10, padding: '0 4px', fontSize: 12, color: 'var(--text-disabled)', lineHeight: 1.5 }}>
+            iOS: instala desde Safari → Compartir → Añadir a pantalla de inicio (iOS 16.4+).
+          </div>
+        )}
+      </div>
+
+      {/* Acerca de */}
+      <div>
+        <SectionLabel>Acerca de</SectionLabel>
+        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 18, overflow: 'hidden' }}>
+          <Row icon={Info} iconColor="--text-disabled" label="Sheriff Home" value="v0.2.0" />
+          <Row label="Alonso Javier · Lima · 2026" last
+            action={
+              <a
+                href="https://github.com/alonsix33/VerisureSix6"
+                target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--accent-text)', textDecoration: 'none' }}
+              >
+                GitHub <ExternalLink size={12} />
+              </a>
+            }
+          />
+        </div>
+      </div>
+
     </div>
   )
 }

@@ -226,7 +226,7 @@ export default function Layout() {
         )}
 
         {/* Page content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-safe-nav md:pb-6">
+        <div className="flex-1 overflow-y-auto px-5 py-6 md:px-7 md:py-7 pb-safe-nav md:pb-7">
           <Outlet />
         </div>
 
