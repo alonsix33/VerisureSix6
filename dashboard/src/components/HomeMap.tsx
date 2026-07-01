@@ -1,120 +1,82 @@
 import { useStore } from '../store'
 
 const ROOMS = [
-  { id: 'sala',    label: 'Sala',    x: 2,  y: 2,  w: 46, h: 50 },
-  { id: 'cocina',  label: 'Cocina',  x: 2,  y: 54, w: 46, h: 44 },
-  { id: 'balcon',  label: 'Balcón',  x: 50, y: 2,  w: 48, h: 46 },
-  { id: 'entrada', label: 'Entrada', x: 50, y: 50, w: 48, h: 48 },
+  { id: 'sala',       label: 'Sala',       x: 10,  y: 10,  w: 150, h: 112, fillC: 'rgba(126,148,102,0.10)', strokeC: 'rgba(126,148,102,0.22)', textC: '#7A7065' },
+  { id: 'dormitorio', label: 'Dormitorio', x: 170, y: 10,  w: 142, h: 72,  fillC: 'rgba(223,162,81,0.12)',  strokeC: 'rgba(223,162,81,0.28)',  textC: '#7A7065' },
+  { id: 'cocina',     label: 'Cocina',     x: 170, y: 92,  w: 142, h: 58,  fillC: 'rgba(168,155,140,0.10)', strokeC: 'rgba(168,155,140,0.22)', textC: '#9A8E7E' },
+  { id: 'entrada',    label: 'Entrada',    x: 10,  y: 132, w: 150, h: 66,  fillC: 'rgba(194,98,72,0.11)',   strokeC: 'rgba(194,98,72,0.28)',   textC: '#B05A40' },
+  { id: 'nucleo',     label: 'Núcleo',     x: 170, y: 160, w: 142, h: 38,  fillC: 'rgba(126,148,102,0.10)', strokeC: 'rgba(126,148,102,0.20)', textC: '#7A7065' },
 ]
 
-const SENSORS: { zone: string; x: number; y: number }[] = [
-  { zone: 'sala',    x: 25, y: 27 },
-  { zone: 'cocina',  x: 25, y: 76 },
-  { zone: 'balcon',  x: 74, y: 25 },
-  { zone: 'entrada', x: 74, y: 74 },
-]
-
-const LEGEND = [
-  { label: 'Normal', token: '--map-dot-inactive' },
-  { label: 'Activo', token: '--map-dot-active' },
-  { label: 'Alerta', token: '--map-dot-alert' },
-]
 
 export default function HomeMap() {
   const events = useStore((s) => s.events)
 
-  const zoneActivity = new Map<string, number>()
-  events.slice(0, 100).forEach((e) => {
-    if (e.zone) zoneActivity.set(e.zone, (zoneActivity.get(e.zone) || 0) + 1)
-  })
-
   const hasAlert = (zone: string) =>
-    events.slice(0, 20).some((e) => e.zone === zone && e.alert_level !== 'none')
+    events.slice(0, 20).some(
+      (e) => e.zone?.toLowerCase() === zone && (e.alert_level === 'high' || e.alert_level === 'critical'),
+    )
+
+  const entradaAlert = hasAlert('entrada')
 
   return (
-    <div
-      className="relative overflow-hidden rounded-xl"
-      style={{ background: 'var(--surface-overlay)' }}
-    >
-      <svg viewBox="0 0 100 100" className="w-full aspect-[4/3] max-h-64">
-
-        {ROOMS.map((room) => {
-          const count   = zoneActivity.get(room.id) || 0
-          const active  = count > 0
-          const alertOn = hasAlert(room.id)
-
-          const fillToken   = alertOn ? '--map-room-alert' : active ? '--map-room-active' : '--map-room-inactive'
-          const strokeToken = alertOn ? '--map-border-alert' : active ? '--map-border-active' : '--map-border-inactive'
-          const textToken   = alertOn ? '--map-text-alert' : active ? '--map-text-active' : '--map-text-inactive'
-
-          return (
-            <g key={room.id}>
-              <rect
-                x={room.x + 0.5} y={room.y + 0.5}
-                width={room.w - 1} height={room.h - 1}
-                rx="2"
-                style={{ fill: `var(${fillToken})`, stroke: `var(${strokeToken})`, strokeWidth: 0.6 }}
-              />
-              <text
-                x={room.x + room.w / 2}
-                y={room.y + room.h / 2 + 1.5}
-                textAnchor="middle"
-                fontSize="4"
-                fontFamily="Inter, system-ui, sans-serif"
-                style={{ fill: `var(${textToken})` }}
-              >
-                {room.label}
-              </text>
-            </g>
-          )
-        })}
-
-        {SENSORS.map((sensor) => {
-          const count   = zoneActivity.get(sensor.zone) || 0
-          const active  = count > 1
-          const alertOn = hasAlert(sensor.zone)
-
-          const dotToken   = alertOn ? '--map-dot-alert' : active ? '--map-dot-active' : '--map-dot-inactive'
-          const pulseToken = alertOn ? '--map-pulse-alert' : '--map-pulse-active'
-          const ringToken  = alertOn ? '--map-border-alert' : '--map-border-active'
-
-          return (
-            <g key={sensor.zone}>
-              {(active || alertOn) && (
-                <circle
-                  cx={sensor.x} cy={sensor.y} r="4.5"
-                  style={{ fill: `var(${pulseToken})`, stroke: `var(${ringToken})`, strokeWidth: 0.5 }}
-                  className="pulse-ring"
-                />
-              )}
-              <circle
-                cx={sensor.x} cy={sensor.y} r="2"
-                style={{ fill: `var(${dotToken})` }}
-              />
-            </g>
-          )
-        })}
-      </svg>
-
-      {/* Legend */}
-      <div
-        className="absolute top-2 right-2 flex items-center gap-3 px-2.5 py-1.5 rounded-xl"
-        style={{ background: 'var(--surface-float)' }}
+    <div>
+      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 14 }}>
+        Plano del hogar
+      </p>
+      <svg
+        width="100%"
+        viewBox="0 0 322 210"
+        style={{ display: 'block' }}
+        aria-label="Plano del hogar"
       >
-        {LEGEND.map((item) => (
-          <span
-            key={item.label}
-            className="flex items-center gap-1 text-[10px]"
-            style={{ color: 'var(--text-tertiary)' }}
-          >
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ background: `var(${item.token})` }}
+        {ROOMS.map((r) => (
+          <g key={r.id}>
+            <rect
+              x={r.x} y={r.y} width={r.w} height={r.h} rx={9}
+              fill={r.fillC} stroke={r.strokeC} strokeWidth={1}
             />
-            {item.label}
-          </span>
+            <text
+              x={r.x + 10} y={r.y + 18}
+              fill={r.textC}
+              fontSize={11}
+              fontFamily="'Hanken Grotesk', system-ui, sans-serif"
+              fontWeight={600}
+            >
+              {r.label}
+            </text>
+          </g>
         ))}
-      </div>
+
+        {/* Sala sensor */}
+        <circle cx={128} cy={58} r={4} fill="var(--status-safe)" />
+
+        {/* Dormitorio sensor */}
+        <circle cx={278} cy={48} r={4} fill="var(--accent)" />
+
+        {/* Cocina sensor */}
+        <circle cx={198} cy={126} r={4} fill="var(--status-offline)" />
+
+        {/* Entrada — pulso animado */}
+        <circle
+          cx={56} cy={170} r={7}
+          fill={entradaAlert ? 'rgba(194,98,72,0.4)' : 'rgba(194,98,72,0.25)'}
+          style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+          className="anim-pulse"
+        />
+        <circle cx={56} cy={170} r={4.5} fill="var(--level-importante)" />
+
+        <circle
+          cx={118} cy={170} r={7}
+          fill={entradaAlert ? 'rgba(194,98,72,0.4)' : 'rgba(194,98,72,0.25)'}
+          style={{ transformBox: 'fill-box', transformOrigin: 'center', animationDelay: '0.7s' }}
+          className="anim-pulse"
+        />
+        <circle cx={118} cy={170} r={4.5} fill="var(--level-importante)" />
+
+        {/* Núcleo sensor */}
+        <circle cx={241} cy={178} r={3.5} fill="var(--status-safe)" />
+      </svg>
     </div>
   )
 }
