@@ -1,148 +1,151 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useStore } from '../store'
+import { Toaster } from 'sonner'
 import {
-  LayoutDashboard, Radio, Camera, MessageSquare,
-  CalendarDays, Settings, X, AlertTriangle, Shield,
-} from 'lucide-react'
-
-const DESKTOP_NAV = [
-  { to: '/',          label: 'Dashboard',  icon: LayoutDashboard },
-  { to: '/timeline',  label: 'Eventos',    icon: Radio },
-  { to: '/cameras',   label: 'Zonas',      icon: Camera },
-  { to: '/chat',      label: 'Sheriff IA', icon: MessageSquare },
-  { to: '/schedules', label: 'Horarios',   icon: CalendarDays },
-  { to: '/settings',  label: 'Ajustes',    icon: Settings },
-]
+  House, WaveTriangle, ShieldCheck, SquaresFour, SlidersHorizontal,
+  Chat, Eye, GearSix, CalendarBlank, X, Warning,
+} from '@phosphor-icons/react'
 
 const BOTTOM_NAV = [
-  { to: '/',         label: 'Inicio',   icon: LayoutDashboard },
-  { to: '/timeline', label: 'Eventos',  icon: Radio },
-  { to: '/chat',     label: 'Sheriff',  icon: MessageSquare },
-  { to: '/cameras',  label: 'Zonas',    icon: Camera },
-  { to: '/settings', label: 'Ajustes',  icon: Settings },
+  { to: '/',         label: 'Inicio',  Icon: House           },
+  { to: '/timeline', label: 'Hoy',     Icon: WaveTriangle    },
+  { to: '/chat',     label: 'Sheriff', Icon: ShieldCheck     },
+  { to: '/cameras',  label: 'Hogar',   Icon: SquaresFour     },
+  { to: '/settings', label: 'Ajustes', Icon: SlidersHorizontal },
 ]
 
+const SIDEBAR_NAV = [
+  { to: '/',          label: 'Dashboard',  Icon: SquaresFour   },
+  { to: '/timeline',  label: 'Eventos',    Icon: WaveTriangle  },
+  { to: '/cameras',   label: 'Zonas',      Icon: Eye           },
+  { to: '/chat',      label: 'Sheriff IA', Icon: Chat          },
+  { to: '/schedules', label: 'Rutinas',    Icon: CalendarBlank },
+  { to: '/settings',  label: 'Ajustes',   Icon: GearSix       },
+]
+
+const MODE_LABELS: Record<string, string> = {
+  off: 'Apagado', monitor: 'Monitor', casa: 'Casa',
+  fuera: 'Fuera', noche: 'Noche', viaje: 'Viaje',
+}
+
+function fmtClock() {
+  return new Date().toLocaleTimeString('es', { hour: 'numeric', minute: '2-digit' })
+}
+
 export default function Layout() {
-  const sidebarOpen    = useStore((s) => s.sidebarOpen)
-  const setSidebarOpen = useStore((s) => s.setSidebarOpen)
-  const health         = useStore((s) => s.health)
-  const config         = useStore((s) => s.config)
-  const wsConnected    = useStore((s) => s.wsConnected)
-  const error          = useStore((s) => s.error)
-  const clearError     = useStore((s) => s.clearError)
+  const config      = useStore((s) => s.config)
+  const health      = useStore((s) => s.health)
+  const wsConnected = useStore((s) => s.wsConnected)
+  const error       = useStore((s) => s.clearError)
+  const errorMsg    = useStore((s) => s.error)
+  const location    = useLocation()
+
+  const [clock, setClock] = useState(fmtClock)
+  useEffect(() => {
+    const id = setInterval(() => setClock(fmtClock()), 30000)
+    return () => clearInterval(id)
+  }, [])
 
   const mode = config?.mode || 'off'
 
   return (
-    <div className="flex h-full relative" style={{ background: 'var(--surface-base)' }}>
+    <div style={{ display: 'flex', minHeight: '100dvh', background: 'var(--surface-viewport)' }}>
 
-      {/* Desktop sidebar overlay (mobile) */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-20 md:hidden"
-          style={{ background: 'rgba(0,0,0,0.60)' }}
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: 'var(--surface-card)',
+            border: '1px solid var(--border-default)',
+            color: 'var(--text-primary)',
+            fontFamily: 'var(--font-ui)',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 14,
+          },
+        }}
+      />
 
-      {/* ── Sidebar (desktop always, mobile drawer) ── */}
+      {/* ── SIDEBAR (desktop ≥768px) ── */}
       <aside
-        className={[
-          'fixed md:static inset-y-0 left-0 z-30 flex flex-col',
-          'transform transition-transform duration-300 ease-out',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-        ].join(' ')}
+        className="hidden md:flex flex-col"
         style={{
-          width: '240px',
-          background: 'var(--surface-raised)',
-          borderRight: '1px solid var(--border-subtle)',
+          width: 240, flexShrink: 0,
+          background: 'var(--surface-card)',
+          borderRight: '1px solid var(--border-default)',
+          position: 'sticky', top: 0, height: '100dvh',
         }}
       >
         {/* Logo */}
-        <div
-          className="px-5 py-4 flex items-center justify-between shrink-0"
-          style={{ borderBottom: '1px solid var(--border-subtle)' }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{ background: `var(--mode-${mode}-bg)`, border: `1px solid var(--mode-${mode}-border)` }}
-              >
-                <Shield size={18} style={{ color: `var(--mode-${mode})` }} />
-              </div>
-              {wsConnected && (
-                <span
-                  className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full"
-                  style={{
-                    background: 'var(--status-safe)',
-                    boxShadow: '0 0 0 2px var(--surface-raised)',
-                  }}
-                />
-              )}
+        <div style={{
+          padding: '22px 20px 16px',
+          borderBottom: '1px solid var(--border-subtle)',
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 'var(--radius-sm)',
+            background: 'var(--accent-subtle)',
+            border: '1.5px solid var(--accent-border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Chat size={18} weight="fill" style={{ color: 'var(--accent)' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-display)', letterSpacing: '-0.01em' }}>
+              Sheriff
             </div>
-            <div>
-              <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Sheriff</div>
-              <div className="text-[10px] font-mono tracking-widest" style={{ color: 'var(--text-disabled)' }}>
-                HOME SECURITY
-              </div>
+            <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', color: 'var(--text-disabled)', textTransform: 'uppercase' }}>
+              Home Security
             </div>
           </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="md:hidden transition-colors"
-            style={{ color: 'var(--text-tertiary)' }}
-          >
-            <X size={16} />
-          </button>
         </div>
 
         {/* Mode chip */}
-        <div
-          className="mx-4 my-3 px-3 py-2 rounded-xl flex items-center gap-2 shrink-0"
-          style={{ background: `var(--mode-${mode}-bg)`, border: `1px solid var(--mode-${mode}-border)` }}
-        >
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ background: `var(--mode-${mode})` }}
-          />
-          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: `var(--mode-${mode})` }}>
-            {mode}
+        <div style={{
+          margin: '14px 16px 8px',
+          padding: '10px 14px',
+          borderRadius: 'var(--radius-md)',
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'var(--accent-subtle)',
+          border: '1px solid var(--accent-border)',
+        }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: 'var(--accent)',
+            flexShrink: 0,
+          }} className="anim-breathe" />
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-text)', flex: 1 }}>
+            {MODE_LABELS[mode] ?? mode}
           </span>
-          <span
-            className={`ml-auto w-1.5 h-1.5 rounded-full ${wsConnected ? 'animate-pulse' : ''}`}
-            style={{ background: wsConnected ? 'var(--status-safe)' : 'var(--status-alert)' }}
-          />
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: wsConnected ? 'var(--status-safe)' : 'var(--status-alert)',
+            flexShrink: 0,
+          }} />
         </div>
 
-        {/* Nav items */}
-        <nav className="flex-1 px-3 pb-3 space-y-0.5 overflow-y-auto">
-          {DESKTOP_NAV.map((item) => (
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
+          {SIDEBAR_NAV.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  isActive ? 'sidebar-item-active' : 'sidebar-item'
-                }`
-              }
-              style={({ isActive }) => isActive
-                ? {
-                    background: 'var(--accent-subtle)',
-                    color: 'var(--accent-text)',
-                    border: '1px solid var(--accent-border)',
-                  }
-                : {
-                    color: 'var(--text-tertiary)',
-                    border: '1px solid transparent',
-                  }
-              }
+              style={({ isActive }) => ({
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+                fontSize: 14, fontWeight: isActive ? 600 : 400,
+                textDecoration: 'none',
+                transition: 'all var(--transition-base)',
+                background: isActive ? 'var(--accent-subtle)' : 'transparent',
+                color: isActive ? 'var(--accent-dark)' : 'var(--text-tertiary)',
+                border: isActive ? '1px solid var(--accent-border)' : '1px solid transparent',
+              })}
             >
               {({ isActive }) => (
                 <>
-                  <item.icon size={17} strokeWidth={isActive ? 2.5 : 2} />
+                  <item.Icon size={17} weight={isActive ? 'fill' : 'regular'} style={{ flexShrink: 0 }} />
                   {item.label}
                 </>
               )}
@@ -151,111 +154,131 @@ export default function Layout() {
         </nav>
 
         {/* Footer */}
-        <div
-          className="px-5 py-3 shrink-0"
-          style={{ borderTop: '1px solid var(--border-subtle)' }}
-        >
-          <div className="flex items-center text-xs font-mono" style={{ color: 'var(--text-disabled)' }}>
-            <span>v{health?.version ?? '0.2.0'}</span>
-            <span
-              className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-semibold"
-              style={{
-                background: health?.mock_sensors ? 'var(--status-warn-bg)' : 'var(--status-safe-bg)',
-                color: health?.mock_sensors ? 'var(--status-warn)' : 'var(--status-safe)',
-              }}
-            >
-              {health?.mock_sensors ? 'MOCK' : 'LIVE'}
-            </span>
-          </div>
+        <div style={{
+          padding: '12px 20px', borderTop: '1px solid var(--border-subtle)',
+          display: 'flex', alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-disabled)' }}>
+            v{health?.version ?? '0.2.0'}
+          </span>
+          <span style={{
+            marginLeft: 'auto', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+            padding: '3px 8px', borderRadius: 8,
+            background: health?.mock_sensors ? 'var(--accent-subtle)' : 'rgba(126,148,102,0.14)',
+            color: health?.mock_sensors ? 'var(--accent-text)' : 'var(--status-safe-dark)',
+            border: `1px solid ${health?.mock_sensors ? 'var(--accent-border)' : 'rgba(126,148,102,0.3)'}`,
+          }}>
+            {health?.mock_sensors ? 'MOCK' : 'LIVE'}
+          </span>
         </div>
       </aside>
 
-      {/* ── Main area ── */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      {/* ── MAIN ── */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
-        {/* Mobile top bar */}
-        <header
-          className="md:hidden flex items-center gap-3 px-4 py-3 shrink-0"
+        {/* Mobile status bar overlay */}
+        <div
+          className="md:hidden"
           style={{
-            background: 'var(--surface-raised)',
-            borderBottom: '1px solid var(--border-subtle)',
+            position: 'fixed', top: 0, left: 0, right: 0,
+            height: 46, zIndex: 35, pointerEvents: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '0 24px',
           }}
         >
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: `var(--mode-${mode}-bg)` }}
-          >
-            <Shield size={15} style={{ color: `var(--mode-${mode})` }} />
-          </div>
-          <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Sheriff Home</span>
-          <div className="ml-auto flex items-center gap-2">
-            <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full uppercase"
-              style={{ background: `var(--mode-${mode}-bg)`, color: `var(--mode-${mode})` }}
-            >
-              {mode}
+          {/* Left: clock + ws dot */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+              {clock}
             </span>
-            <span
-              className={`w-2 h-2 rounded-full ${wsConnected ? 'animate-pulse' : ''}`}
-              style={{ background: wsConnected ? 'var(--status-safe)' : 'var(--status-alert)' }}
-            />
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: wsConnected ? 'var(--status-safe)' : 'var(--status-alert)',
+              display: 'block',
+              animation: wsConnected ? 'scBreathe 2.6s ease-in-out infinite' : 'none',
+            }} />
           </div>
-        </header>
+          {/* Right: mock pill */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center',
+            padding: '2px 9px', borderRadius: 9999,
+            background: health?.mock_sensors ? 'var(--accent-subtle)' : 'rgba(126,148,102,0.14)',
+            fontSize: 9, fontWeight: 700, letterSpacing: '0.8px',
+            color: health?.mock_sensors ? 'var(--accent-dark)' : 'var(--status-safe-dark)',
+          }}>
+            {health?.mock_sensors ? 'MOCK' : 'LIVE'}
+          </span>
+        </div>
 
         {/* Error banner */}
-        {error && (
-          <div className="mx-4 mt-3 shrink-0">
-            <div
-              className="flex items-center gap-3 px-4 py-3 rounded-xl"
-              style={{
-                background: 'var(--status-alert-bg)',
-                border: '1px solid var(--status-alert-border)',
-              }}
-            >
-              <AlertTriangle size={15} style={{ color: 'var(--status-alert)' }} className="shrink-0" />
-              <span className="flex-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{error}</span>
-              <button
-                onClick={clearError}
-                className="transition-colors"
-                style={{ color: 'var(--status-alert)' }}
-              >
-                <X size={15} />
-              </button>
-            </div>
+        {errorMsg && (
+          <div style={{
+            margin: '12px 20px 0', flexShrink: 0,
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '12px 14px', borderRadius: 'var(--radius-md)',
+            background: 'var(--accent-subtle)',
+            border: '1px solid var(--accent-border)',
+          }}>
+            <Warning size={14} style={{ color: 'var(--accent-dark)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 13, color: 'var(--text-secondary)' }}>{errorMsg}</span>
+            <button onClick={error} style={{ color: 'var(--text-tertiary)', display: 'flex' }}>
+              <X size={14} />
+            </button>
           </div>
         )}
 
         {/* Page content */}
-        <div className="flex-1 overflow-y-auto px-5 py-6 md:px-7 md:py-7 pb-safe-nav md:pb-7">
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '0 0 120px',
+          }}
+        >
           <Outlet />
         </div>
 
-        {/* ── Mobile bottom nav ── */}
-        <nav className="bottom-nav md:hidden">
-          {BOTTOM_NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className="flex-1 flex flex-col items-center justify-center gap-1 relative transition-all"
-              style={({ isActive }) => ({
-                color: isActive ? 'var(--accent-text)' : 'var(--text-tertiary)',
-              })}
-            >
-              {({ isActive }) => (
-                <>
-                  {isActive && (
-                    <span
-                      className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
-                      style={{ background: 'var(--accent-default)' }}
-                    />
-                  )}
-                  <item.icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
-                  <span className="text-[10px] font-medium">{item.label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
+        {/* ── BOTTOM NAV (mobile) ── */}
+        <nav
+          className="md:hidden"
+          style={{
+            position: 'fixed',
+            left: 14, right: 14, bottom: 14,
+            zIndex: 30,
+            background: 'var(--surface-card)',
+            border: '1px solid var(--border-default)',
+            borderRadius: 26,
+            boxShadow: 'var(--shadow-nav)',
+            padding: 8,
+            display: 'flex', gap: 4,
+          }}
+        >
+          {BOTTOM_NAV.map((item) => {
+            const isActive = item.to === '/'
+              ? location.pathname === '/'
+              : location.pathname.startsWith(item.to)
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', gap: 3, padding: '9px 0',
+                  background: isActive ? 'var(--accent)' : 'transparent',
+                  borderRadius: 17,
+                  color: isActive ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                  textDecoration: 'none',
+                  transition: 'background var(--transition-base)',
+                }}
+              >
+                <item.Icon size={21} weight={isActive ? 'fill' : 'regular'} />
+                <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400 }}>
+                  {item.label}
+                </span>
+              </NavLink>
+            )
+          })}
         </nav>
       </main>
     </div>

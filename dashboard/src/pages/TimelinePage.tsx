@@ -1,335 +1,251 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '../store'
-import type { EventData, FilterLevel } from '../types'
-import { X, ChevronRight, Brain, Shield, Eye } from 'lucide-react'
+import { alertToLevel, fmtTime, relTime, eventTypeName } from '../lib/design'
+import BottomSheet from '../components/BottomSheet'
+import { Camera, Eye, GearSix, Tray } from '@phosphor-icons/react'
+import type { EventData } from '../types'
 
-const LEVELS: FilterLevel[] = ['all', 'critical', 'high', 'medium', 'low', 'none']
+type FilterLevel = 'todos' | 'importante' | 'atencion' | 'rutina' | 'info'
 
-const LEVEL_LABELS: Record<string, string> = {
-  all: 'Todos', none: 'Normal', low: 'Bajo', medium: 'Medio', high: 'Alto', critical: 'Crítico',
+const FILTERS: { id: FilterLevel; label: string }[] = [
+  { id: 'todos',      label: 'Todos'      },
+  { id: 'importante', label: 'Importante' },
+  { id: 'atencion',   label: 'Atención'   },
+  { id: 'rutina',     label: 'Rutina'     },
+  { id: 'info',       label: 'Info'       },
+]
+
+function eventMatchesFilter(ev: EventData, f: FilterLevel): boolean {
+  if (f === 'todos')      return true
+  if (f === 'importante') return ev.alert_level === 'critical' || ev.alert_level === 'high'
+  if (f === 'atencion')   return ev.alert_level === 'medium'
+  if (f === 'rutina')     return ev.alert_level === 'low'
+  return ev.alert_level === 'none'
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 10, paddingLeft: 2 }}>
-      {children}
-    </div>
-  )
+function DeviceIcon({ type }: { type?: string }) {
+  const size = 20
+  if (type?.includes('camera')) return <Camera size={size} weight="duotone" />
+  if (type?.includes('pir') || type?.includes('motion')) return <Eye size={size} weight="duotone" />
+  return <GearSix size={size} weight="duotone" />
 }
 
 export default function TimelinePage() {
   const events       = useStore((s) => s.events)
+  const loading      = useStore((s) => s.loading)
   const fetchInitial = useStore((s) => s.fetchInitial)
-  const [filter, setFilter]     = useState<FilterLevel>('all')
+
+  const [filter, setFilter]     = useState<FilterLevel>('todos')
   const [selected, setSelected] = useState<EventData | null>(null)
 
   useEffect(() => {
     if (events.length === 0) fetchInitial()
   }, [events.length, fetchInitial])
 
-  const filtered = filter === 'all' ? events : events.filter((e) => e.alert_level === filter)
+  const filtered = events.filter((e) => eventMatchesFilter(e, filter))
+
+  const counts: Record<FilterLevel, number> = {
+    todos:      events.length,
+    importante: events.filter((e) => eventMatchesFilter(e, 'importante')).length,
+    atencion:   events.filter((e) => eventMatchesFilter(e, 'atencion')).length,
+    rutina:     events.filter((e) => eventMatchesFilter(e, 'rutina')).length,
+    info:       events.filter((e) => eventMatchesFilter(e, 'info')).length,
+  }
 
   return (
-    <div style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 32 }}>
-
+    <div>
       {/* Header */}
-      <div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: 4 }}>
-          Eventos
-        </h1>
-        <p style={{ fontSize: 14, color: 'var(--text-tertiary)' }}>
-          {filtered.length} registros
-        </p>
+      <div style={{ padding: '58px 18px 0' }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, letterSpacing: '-0.4px', color: '#2C2723' }}>
+          Lo que pasó hoy
+        </div>
+        <div style={{ fontSize: 13, color: '#7A7065', marginTop: 3 }}>
+          {filtered.length} momentos · un día tranquilo en casa
+        </div>
       </div>
 
-      {/* Filter pills — horizontal scroll, no wrap */}
-      <div>
-        <SectionLabel>Filtrar</SectionLabel>
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-          {LEVELS.map((lvl) => {
-            const active = filter === lvl
-            const count  = lvl === 'all' ? events.length : events.filter((e) => e.alert_level === lvl).length
-            return (
-              <button
-                key={lvl}
-                onClick={() => setFilter(lvl)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '9px 16px', borderRadius: 22, whiteSpace: 'nowrap', flexShrink: 0,
-                  fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s',
-                  background: active
-                    ? lvl === 'all' ? 'var(--accent-subtle)' : `var(--level-${lvl}-bg)`
-                    : 'var(--surface-raised)',
-                  color: active
-                    ? lvl === 'all' ? 'var(--accent-text)' : `var(--level-${lvl})`
-                    : 'var(--text-tertiary)',
-                  border: `1px solid ${active
-                    ? lvl === 'all' ? 'var(--accent-border)' : `var(--level-${lvl}-border)`
-                    : 'var(--border-subtle)'}`,
-                }}
-              >
-                {LEVEL_LABELS[lvl]}
-                <span
-                  style={{
-                    fontSize: 11, fontWeight: 600,
-                    background: 'rgba(255,255,255,0.08)',
-                    padding: '1px 6px', borderRadius: 10,
-                  }}
-                >
-                  {count}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+      {/* Filter chips */}
+      <div style={{ display: 'flex', gap: 8, padding: '16px 18px 4px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {FILTERS.map((f) => {
+          const active = f.id === filter
+          return (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              style={{
+                flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 14px',
+                borderRadius: 9999,
+                background: active ? 'var(--accent-subtle)' : 'var(--surface-card)',
+                border: `1px solid ${active ? 'var(--accent-border)' : 'var(--border-medium)'}`,
+                cursor: 'pointer', transition: 'background 200ms ease, border-color 200ms ease',
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 600, color: active ? 'var(--accent-dark)' : 'var(--text-secondary)' }}>
+                {f.label}
+              </span>
+              <span style={{ fontSize: 11, color: active ? 'var(--accent-dark)' : 'var(--text-secondary)', opacity: 0.65, fontVariantNumeric: 'tabular-nums' }}>
+                {counts[f.id]}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       {/* Event list */}
-      <div>
-        <SectionLabel>Registros</SectionLabel>
-        <div
-          style={{
-            background: 'var(--surface-raised)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 18,
-            overflow: 'hidden',
-          }}
-        >
-          <AnimatePresence initial={false}>
-            {filtered.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '48px 20px', textAlign: 'center' }}>
-                <div style={{
-                  width: 52, height: 52, borderRadius: 16,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'var(--surface-overlay)',
-                }}>
-                  <Shield size={24} style={{ color: 'var(--text-disabled)' }} />
-                </div>
-                <span style={{ fontSize: 14, color: 'var(--text-disabled)' }}>
-                  Sin eventos con este filtro
-                </span>
+      <div style={{ padding: '12px 18px 0', display: 'flex', flexDirection: 'column', gap: 11 }}>
+        {loading ? (
+          <LoadingSkeleton />
+        ) : filtered.length === 0 ? (
+          <EmptyState />
+        ) : (
+          filtered.map((ev, i) => {
+            const lv   = alertToLevel(ev.alert_level)
+            const prev = filtered[i - 1]
+            const showDate = i === 0 || new Date(ev.timestamp).toDateString() !== new Date(prev?.timestamp ?? '').toDateString()
+
+            return (
+              <div key={ev.id}>
+                {showDate && (
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: 'var(--text-tertiary)', padding: '8px 4px 4px', textTransform: 'uppercase' }}>
+                    {formatDate(ev.timestamp)}
+                  </div>
+                )}
+                <button
+                  onClick={() => setSelected(ev)}
+                  style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 13,
+                    width: '100%', textAlign: 'left',
+                    padding: 14, borderRadius: 16,
+                    background: lv.bg,
+                    border: 'none',
+                    borderLeft: `4px solid ${lv.color}`,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{
+                    width: 42, height: 42, borderRadius: 13, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: '#FFFCF6', color: lv.color,
+                  }}>
+                    <DeviceIcon type={ev.event_type} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#2C2723' }}>
+                        {ev.device_name ?? ev.device_id}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#ADA293', whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                        {relTime(ev.timestamp)}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#7A7065', marginTop: 3 }}>
+                      {eventTypeName(ev.event_type)} · {ev.zone ?? 'Sin zona'}
+                    </div>
+                    {ev.sheriff_decision?.reasoning && (
+                      <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'flex-start', padding: '8px 10px', borderRadius: 11, background: 'rgba(223,162,81,0.10)', border: '1px solid rgba(223,162,81,0.20)' }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.6px', color: '#B47B2A', flexShrink: 0, marginTop: 2 }}>SHERIFF</span>
+                        <span style={{ fontSize: 12, lineHeight: 1.45, color: '#6B6258' }}>
+                          {ev.sheriff_decision.reasoning.slice(0, 120)}{ev.sheriff_decision.reasoning.length > 120 ? '…' : ''}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </button>
               </div>
-            ) : (
-              filtered.map((event, idx) => (
-                <EventRow
-                  key={event.id}
-                  event={event}
-                  index={idx}
-                  last={idx === filtered.length - 1}
-                  onClick={() => setSelected(event)}
-                />
-              ))
-            )}
-          </AnimatePresence>
-        </div>
+            )
+          })
+        )}
       </div>
 
-      <AnimatePresence>
-        {selected && <EventModal event={selected} onClose={() => setSelected(null)} />}
-      </AnimatePresence>
+      {/* Event detail sheet */}
+      <BottomSheet open={!!selected} onClose={() => setSelected(null)}>
+        {selected && <TimelineEventDetail ev={selected} />}
+      </BottomSheet>
     </div>
   )
 }
 
-function EventRow({ event, index, last, onClick }: {
-  event: EventData; index: number; last: boolean; onClick: () => void
-}) {
-  const level = event.alert_level
-
+function TimelineEventDetail({ ev }: { ev: EventData }) {
+  const lv = alertToLevel(ev.alert_level)
+  const d  = ev.sheriff_decision
   return (
-    <motion.button
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: Math.min(index * 0.02, 0.2) }}
-      onClick={onClick}
-      style={{
-        width: '100%', textAlign: 'left', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: 14,
-        padding: '14px 20px',
-        minHeight: 64,
-        borderLeft: `3px solid var(--level-${level})`,
-        borderBottom: last ? 'none' : '1px solid var(--border-subtle)',
-        background: level !== 'none' ? `var(--level-${level}-bg)` : 'transparent',
-        transition: 'background 0.15s',
-      }}
-    >
-      {/* Icon */}
-      <div style={{
-        width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--surface-overlay)',
-      }}>
-        <Eye size={17} style={{ color: `var(--level-${level})` }} />
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
-          <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {event.device_name ?? event.device_id}
-          </span>
-          {level !== 'none' && (
-            <span style={{
-              fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-              padding: '2px 8px', borderRadius: 10, flexShrink: 0,
-              background: `var(--level-${level}-bg)`, color: `var(--level-${level})`,
-            }}>
-              {level}
-            </span>
-          )}
+    <div style={{ padding: '10px 22px 34px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+        <div style={{
+          width: 50, height: 50, borderRadius: 15,
+          background: lv.bg, border: `1px solid ${lv.color}40`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, color: lv.color,
+        }}>
+          <DeviceIcon type={ev.event_type} />
         </div>
-        <div style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
-          <span>{event.zone ?? '—'}</span>
-          <span style={{ color: 'var(--text-disabled)' }}>·</span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {event.event_type.replace(/_/g, ' ')}
-          </span>
-        </div>
-        {event.sheriff_evaluated && event.sheriff_decision?.reasoning && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 5, marginTop: 4 }}>
-            <Brain size={10} style={{ color: 'var(--accent-text)', flexShrink: 0, marginTop: 1 }} />
-            <span style={{ fontSize: 11, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
-              {event.sheriff_decision.reasoning}
-            </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 'var(--radius-pill)', background: lv.bg, fontSize: 10, fontWeight: 700, color: lv.text, marginBottom: 6, textTransform: 'uppercase' }}>
+            {lv.label}
           </div>
-        )}
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {ev.device_name ?? ev.device_id}
+          </div>
+        </div>
       </div>
 
-      {/* Right */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-        <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-disabled)' }}>
-          {new Date(event.timestamp).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--text-disabled)' }}>
-          {new Date(event.timestamp).toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}
-        </span>
-        <ChevronRight size={14} style={{ color: 'var(--text-disabled)' }} />
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        {[
+          { label: 'ZONA', val: ev.zone ?? '—' },
+          { label: 'TIPO', val: eventTypeName(ev.event_type) },
+          { label: 'HORA', val: fmtTime(ev.timestamp) },
+        ].map((item) => (
+          <div key={item.label} style={{ flex: 1, padding: 11, borderRadius: 'var(--radius-sm)', background: 'var(--surface-input)' }}>
+            <div style={{ fontSize: 9, letterSpacing: '0.5px', color: 'var(--text-tertiary)', marginBottom: 4, textTransform: 'uppercase' }}>{item.label}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.val}</div>
+          </div>
+        ))}
       </div>
-    </motion.button>
+
+      {d?.reasoning && (
+        <div style={{ marginBottom: 14, padding: 14, borderRadius: 15, background: 'var(--level-atencion-bg)', border: '1px solid rgba(223,162,81,0.20)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.4px', color: 'var(--accent-dark)', marginBottom: 7, textTransform: 'uppercase' }}>Sheriff te cuenta</div>
+          <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-secondary)' }}>{d.reasoning}</div>
+        </div>
+      )}
+
+      {d?.recommended_action && (
+        <div style={{ padding: 14, borderRadius: 15, background: 'var(--level-rutina-bg)', border: '1px solid rgba(126,148,102,0.25)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.6px', color: 'var(--status-safe-dark)', marginBottom: 6, textTransform: 'uppercase' }}>Qué puedes hacer</div>
+          <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--level-rutina-text)' }}>{d.recommended_action}</div>
+        </div>
+      )}
+    </div>
   )
 }
 
-function EventModal({ event, onClose }: { event: EventData; onClose: () => void }) {
-  const level = event.alert_level
-  const d = event.sheriff_decision
+function EmptyState() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '64px 30px' }}>
+      <Tray size={42} style={{ color: '#ADA293', marginBottom: 16 }} />
+      <div style={{ fontSize: 15, fontWeight: 600, color: '#7A7065' }}>Nada de este tipo hoy</div>
+      <div style={{ fontSize: 13, color: '#ADA293', marginTop: 4 }}>Eso casi siempre es buena señal.</div>
+    </div>
+  )
+}
 
+function LoadingSkeleton() {
   return (
     <>
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.70)', backdropFilter: 'blur(8px)' }}
-      />
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
-          background: 'var(--surface-raised)',
-          borderTop: '1px solid var(--border-default)',
-          borderRadius: '24px 24px 0 0',
-          padding: '28px 24px',
-          paddingBottom: 'calc(28px + env(safe-area-inset-bottom))',
-          maxHeight: '80dvh', overflowY: 'auto',
-        }}
-      >
-        {/* Pull handle */}
-        <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--border-strong)', margin: '-12px auto 20px' }} />
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{
-              width: 48, height: 48, borderRadius: 14,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: `var(--level-${level}-bg)`,
-              border: `1px solid var(--level-${level}-border)`,
-            }}>
-              <Shield size={22} style={{ color: `var(--level-${level})` }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
-                {event.device_name ?? event.device_id}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                {event.event_type.replace(/_/g, ' ')}
-              </div>
-            </div>
-          </div>
-          <button onClick={onClose} style={{ color: 'var(--text-tertiary)', padding: 4 }}>
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Level badge */}
-        <div
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '8px 16px', borderRadius: 24, marginBottom: 24,
-            background: `var(--level-${level}-bg)`,
-            border: `1px solid var(--level-${level}-border)`,
-          }}
-        >
-          <div style={{ width: 8, height: 8, borderRadius: 4, background: `var(--level-${level})` }} />
-          <span style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: `var(--level-${level})` }}>
-            {level}
-          </span>
-        </div>
-
-        {/* Details grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
-          {[
-            { label: 'Zona',        value: event.zone ?? '—' },
-            { label: 'Dispositivo', value: event.device_id },
-            { label: 'Timestamp',   value: new Date(event.timestamp).toLocaleString('es-PE') },
-            { label: 'Evaluado IA', value: event.sheriff_evaluated ? 'Sí' : 'No' },
-          ].map((item) => (
-            <div key={item.label} style={{
-              background: 'var(--surface-overlay)', borderRadius: 14, padding: '14px 16px',
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 6 }}>
-                {item.label}
-              </div>
-              <div style={{ fontSize: 13, fontFamily: 'monospace', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-                {item.value}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* AI analysis */}
-        {d && (
-          <div style={{
-            background: 'var(--surface-overlay)',
-            border: '1px solid var(--accent-border)',
-            borderRadius: 16, padding: '18px 20px',
-            display: 'flex', flexDirection: 'column', gap: 16,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--accent-text)' }}>
-              <Brain size={14} /> Análisis Sheriff IA
-            </div>
-            {d.reasoning && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 6 }}>Razonamiento</div>
-                <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-secondary)' }}>{d.reasoning}</p>
-              </div>
-            )}
-            {d.message && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 6 }}>Mensaje</div>
-                <p style={{ fontSize: 14, color: 'var(--text-primary)' }}>{d.message}</p>
-              </div>
-            )}
-            {d.recommended_action && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 6 }}>Acción recomendada</div>
-                <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--status-warn)' }}>{d.recommended_action}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </motion.div>
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="anim-shimmer" style={{ height: 80, borderRadius: 16 }} />
+      ))}
     </>
   )
+}
+
+function formatDate(ts: string): string {
+  const d   = new Date(ts)
+  const now = new Date()
+  if (d.toDateString() === now.toDateString()) return 'Hoy'
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (d.toDateString() === yesterday.toDateString()) return 'Ayer'
+  return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
 }

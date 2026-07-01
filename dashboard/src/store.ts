@@ -4,7 +4,7 @@ import type {
   Schedule, TravelPeriod, StatsSummary, SheriffStatus,
 } from './types'
 
-export const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+export const API = import.meta.env.VITE_API_URL || ''
 
 interface AppState {
   events: EventData[]
@@ -63,7 +63,9 @@ export const useStore = create<AppState>((set) => ({
     error: null,
   })),
   setDevices: (devices) => set({ devices }),
-  setConfig: (config) => set({ config }),
+  setConfig: (config) => {
+    set({ config })
+  },
   setHealth: (health) => set({ health }),
   setSchedules: (schedules) => set({ schedules }),
   setTravelPeriods: (periods) => set({ travelPeriods: periods }),

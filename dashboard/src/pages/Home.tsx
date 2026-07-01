@@ -1,490 +1,459 @@
-import { useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect } from 'react'
 import { useStore } from '../store'
-import {
-  Activity, AlertTriangle, Shield, Wifi, WifiOff,
-  Eye, ChevronRight, Radio, MapPin,
-} from 'lucide-react'
-import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
-import { Link } from 'react-router-dom'
+import { CaretRight, Camera, Eye, GearSix, Bell, X, Check } from '@phosphor-icons/react'
+import { useNavigate } from 'react-router-dom'
+import BottomSheet from '../components/BottomSheet'
+import { MODE_META, MODE_COLOR_RAW, alertToLevel, relTime, buildChart, fmtTime, eventTypeName } from '../lib/design'
+import type { EventData } from '../types'
 
-const MODE_META = {
-  off:     { label: 'Apagado',  desc: 'Sistema inactivo' },
-  monitor: { label: 'Monitor',  desc: 'Solo registra' },
-  casa:    { label: 'Casa',     desc: 'Alguien en casa' },
-  fuera:   { label: 'Fuera',    desc: 'Casa vacía' },
-  noche:   { label: 'Noche',    desc: 'Todos durmiendo' },
-  viaje:   { label: 'Viaje',    desc: 'Máxima alerta' },
-} as const
+const MODES = ['off', 'monitor', 'casa', 'fuera', 'noche', 'viaje']
 
-/* ─── Section label ─────────────────────────────── */
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 10, paddingLeft: 2 }}>
-      {children}
-    </div>
-  )
+const ZONE_LABELS: Record<string, string> = {
+  sala: 'Sala', cocina: 'Cocina', balcon: 'Balcón', balcón: 'Balcón',
+  entrada: 'Entrada', dormitorio: 'Dormitorio', nucleo: 'Núcleo', núcleo: 'Núcleo',
 }
 
-/* ─── List item row ─────────────────────────────── */
-function ListRow({
-  icon: Icon,
-  iconBg = 'var(--surface-overlay)',
-  iconColor = 'var(--text-tertiary)',
-  title,
-  subtitle,
-  right,
-  last = false,
-}: {
-  icon: React.ElementType
-  iconBg?: string
-  iconColor?: string
-  title: string
-  subtitle?: string
-  right?: React.ReactNode
-  last?: boolean
-}) {
-  return (
-    <div
-      style={{
-        display: 'flex', alignItems: 'center', gap: 14,
-        padding: '14px 0',
-        minHeight: 60,
-        borderBottom: last ? 'none' : '1px solid var(--border-subtle)',
-      }}
-    >
-      <div
-        style={{
-          width: 42, height: 42, borderRadius: 12,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: iconBg,
-          flexShrink: 0,
-        }}
-      >
-        <Icon size={18} style={{ color: iconColor }} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-          {title}
-        </div>
-        {subtitle && (
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
-            {subtitle}
-          </div>
-        )}
-      </div>
-      {right}
-    </div>
-  )
+const ZONE_COLORS = [
+  'var(--level-importante)', 'var(--level-atencion)', 'var(--level-atencion)',
+  'var(--status-offline)', 'var(--status-safe)',
+]
+
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Buenos días,'
+  if (h < 19) return 'Buenas tardes,'
+  return 'Buenas noches,'
 }
 
 export default function Home() {
+  const navigate     = useNavigate()
   const events       = useStore((s) => s.events)
+  const devices      = useStore((s) => s.devices)
   const config       = useStore((s) => s.config)
   const stats        = useStore((s) => s.stats)
-  const devices      = useStore((s) => s.devices)
-  const wsConnected  = useStore((s) => s.wsConnected)
   const loading      = useStore((s) => s.loading)
+  const updateMode   = useStore((s) => s.updateSheriffMode)
   const fetchInitial = useStore((s) => s.fetchInitial)
   const fetchStats   = useStore((s) => s.fetchStats)
-  const updateMode   = useStore((s) => s.updateSheriffMode)
+
+  const [modeSheetOpen, setModeSheetOpen] = useState(false)
+  const [eventSheet, setEventSheet]       = useState<EventData | null>(null)
+  const [errDismiss, setErrDismiss]       = useState(false)
 
   useEffect(() => {
     fetchInitial()
     fetchStats()
   }, [fetchInitial, fetchStats])
 
-  const mode = (config?.mode ?? 'off') as keyof typeof MODE_META
-  const meta = MODE_META[mode] ?? MODE_META.off
+  const mode        = config?.mode ?? 'fuera'
+  const modeColor   = MODE_COLOR_RAW[mode] ?? MODE_COLOR_RAW.fuera
+  const modeMeta    = MODE_META[mode] ?? MODE_META.fuera
 
-  const todayEvents = stats?.today.total_events ?? events.length
-  const todayAlerts = stats?.today.alerts ?? events.filter((e) => {
-    const today = new Date().toISOString().slice(0, 10)
-    return e.timestamp?.startsWith(today) && e.alert_level !== 'none'
-  }).length
+  const recentEvents    = events.slice(0, 5)
+  const importantCount  = events.filter((e) => e.alert_level === 'critical' || e.alert_level === 'high').length
+  const todayEvents     = stats?.today.total_events ?? 0
+  const todayAlerts     = stats?.today.alerts ?? 0
+  const onlineDevices   = devices.filter((d) => d.enabled).length
 
-  const recentEvents  = events.slice(0, 5)
-  const hourlyData    = stats?.by_hour ?? []
+  const byHour  = stats?.by_hour ?? []
+  const chart   = buildChart(byHour)
+  const byZone  = (stats?.by_zone ?? []).slice(0, 5)
+  const maxZone = Math.max(...byZone.map((z) => z.count), 1)
 
-  if (loading && events.length === 0) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-        <div className="skeleton" style={{ height: 160, borderRadius: 24 }} />
-        <div className="skeleton" style={{ height: 96, borderRadius: 16 }} />
-        <div className="skeleton" style={{ height: 200, borderRadius: 16 }} />
-      </div>
-    )
-  }
+  if (loading) return <LoadingSkeleton />
 
   return (
-    <div style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 36 }}>
+    <div style={{ padding: '56px 18px 0', display: 'flex', flexDirection: 'column' }}>
 
-      {/* ══ HERO ══════════════════════════════════════════ */}
-      <motion.div
-        layout
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div>
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{greeting()}</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.4px', marginTop: 1 }}>
+            Alonso
+          </div>
+        </div>
+        <div style={{
+          width: 46, height: 46, borderRadius: '50%',
+          background: 'var(--accent-subtle)',
+          border: '1px solid var(--border-medium)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--accent-dark)',
+          flexShrink: 0,
+        }}>
+          A
+        </div>
+      </div>
+
+      {/* Hero card */}
+      <button
+        onClick={() => setModeSheetOpen(true)}
         style={{
-          background: `var(--mode-${mode}-bg)`,
-          border: `1px solid var(--mode-${mode}-border)`,
-          borderRadius: 24,
-          padding: '28px 24px',
+          display: 'block', width: '100%', textAlign: 'left',
+          position: 'relative', overflow: 'hidden',
+          borderRadius: 'var(--radius-2xl)',
+          background: 'var(--surface-hero)',
+          padding: 20, minHeight: 188,
+          boxShadow: 'var(--shadow-hero)',
+          marginBottom: 14,
         }}
       >
-        {/* Top row: icon + status chip */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div
-            style={{
-              width: 60, height: 60, borderRadius: 18,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: `var(--mode-${mode}-bg)`,
-              border: `1.5px solid var(--mode-${mode}-border)`,
-              position: 'relative',
-            }}
-          >
-            <Shield size={28} style={{ color: `var(--mode-${mode})` }} />
-            {wsConnected && (
-              <div
-                style={{
-                  position: 'absolute', top: -4, right: -4,
-                  width: 14, height: 14, borderRadius: 7,
-                  background: 'var(--status-safe)',
-                  boxShadow: '0 0 0 2.5px var(--surface-base)',
-                }}
-              />
-            )}
-          </div>
-          <div
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '6px 12px', borderRadius: 20,
-              background: wsConnected ? 'var(--status-safe-bg)' : 'var(--status-offline-bg)',
-              border: `1px solid ${wsConnected ? 'var(--status-safe-border)' : 'var(--status-offline-border)'}`,
-            }}
-          >
-            {wsConnected
-              ? <Wifi size={12} style={{ color: 'var(--status-safe)' }} />
-              : <WifiOff size={12} style={{ color: 'var(--status-offline)' }} />
-            }
-            <span style={{ fontSize: 12, fontWeight: 600, color: wsConnected ? 'var(--status-safe)' : 'var(--status-offline)' }}>
-              {wsConnected ? 'En vivo' : 'Offline'}
-            </span>
-          </div>
-        </div>
-
-        {/* Mode info */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 6 }}>
-            Modo activo
-          </div>
-          <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: '-0.02em', color: `var(--mode-${mode})`, lineHeight: 1.05, marginBottom: 6 }}>
-            {meta.label}
-          </div>
-          <div style={{ fontSize: 14, color: 'var(--text-tertiary)' }}>
-            {meta.desc}
-          </div>
-        </div>
-
-        {/* Mode switcher: horizontal scroll */}
-        <div style={{ marginTop: 4 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 10 }}>
-            Cambiar modo
-          </div>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
-            {(Object.entries(MODE_META) as [string, typeof MODE_META.off][]).map(([m, v]) => (
-              <button
-                key={m}
-                onClick={() => updateMode(m)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 20,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                  background: m === mode ? `var(--mode-${m}-bg)` : 'transparent',
-                  color: m === mode ? `var(--mode-${m})` : 'var(--text-tertiary)',
-                  border: `1px solid ${m === mode ? `var(--mode-${m}-border)` : 'var(--border-subtle)'}`,
-                }}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* ══ HOY ═══════════════════════════════════════════ */}
-      <div>
-        <SectionLabel>Hoy</SectionLabel>
-
-        {/* Split stats card */}
         <div
+          className="anim-float"
           style={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr',
-            background: 'var(--surface-raised)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 18,
-            overflow: 'hidden',
+            position: 'absolute', top: -50, right: -40,
+            width: 230, height: 230, borderRadius: '50%',
+            background: `radial-gradient(circle, ${modeColor}99, transparent 66%)`,
+            filter: 'blur(4px)', pointerEvents: 'none',
           }}
-        >
-          {[
-            { label: 'Eventos', value: todayEvents, icon: Activity, color: '--accent-text' },
-            { label: 'Alertas',  value: todayAlerts,  icon: AlertTriangle, color: todayAlerts > 0 ? '--status-warn' : '--text-disabled' },
-          ].map((stat, i) => (
-            <div
-              key={stat.label}
-              style={{
-                padding: '22px 20px',
-                borderLeft: i > 0 ? '1px solid var(--border-subtle)' : 'none',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <stat.icon size={14} style={{ color: `var(${stat.color})` }} />
-                <span style={{ fontSize: 12, color: 'var(--text-tertiary)', fontWeight: 500 }}>{stat.label}</span>
+        />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+            padding: '6px 12px', borderRadius: 'var(--radius-pill)',
+            background: 'rgba(242,234,221,0.10)',
+          }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: modeColor, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#F2EADD' }}>Modo {modeMeta.label}</span>
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="anim-breathe" style={{ width: 7, height: 7, borderRadius: '50%', background: modeColor }} />
+            <span style={{ fontSize: 12, color: 'rgba(242,234,221,0.55)' }}>En vivo</span>
+          </span>
+        </div>
+        <div style={{ position: 'relative', marginTop: 46 }}>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 600, letterSpacing: '-0.5px',
+            color: importantCount > 0 ? '#EFC07A' : '#F2EADD',
+            lineHeight: 1.12, maxWidth: 250,
+            transition: 'color var(--transition-mode)',
+          }}>
+            {importantCount > 0 ? 'Hay algo por revisar' : 'Todo está en calma'}
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(242,234,221,0.62)', marginTop: 9, maxWidth: 250 }}>
+            {importantCount > 0
+              ? `${importantCount} ${importantCount === 1 ? 'cosa necesita' : 'cosas necesitan'} tu mirada`
+              : `${onlineDevices} dispositivos cuidando tu casa`}
+          </div>
+        </div>
+      </button>
+
+      {/* Error banner (warn) */}
+      {!errDismiss && importantCount > 0 && (
+        <div style={{
+          marginBottom: 14,
+          display: 'flex', alignItems: 'center', gap: 11,
+          padding: '12px 14px', borderRadius: 'var(--radius-md)',
+          background: 'var(--level-atencion-bg)',
+          border: '1px solid rgba(223,162,81,0.28)',
+        }}>
+          <span style={{ display: 'flex', color: '#B47B2A', flexShrink: 0 }}><Bell size={14} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+              {importantCount === 1 ? '1 evento necesita atención' : `${importantCount} eventos necesitan atención`}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 1 }}>Revisa la pantalla de eventos</div>
+          </div>
+          <button onClick={() => setErrDismiss(true)} style={{ color: 'var(--text-tertiary)', display: 'flex', flexShrink: 0, padding: 2 }}><X size={14} /></button>
+        </div>
+      )}
+
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+        {[
+          { val: todayEvents, label: 'Eventos hoy', valColor: 'var(--text-primary)' },
+          { val: onlineDevices, label: 'Zonas en calma', valColor: 'var(--status-safe)' },
+        ].map((card) => (
+          <div key={card.label} style={{
+            flex: 1, padding: 16, borderRadius: 'var(--radius-lg)',
+            background: 'var(--surface-card)',
+            border: '1px solid var(--border-default)',
+            boxShadow: 'var(--shadow-card)',
+          }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: card.valColor, lineHeight: 1 }}>
+              {card.val}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 13, color: 'var(--text-secondary)' }}>{card.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Activity chart */}
+      <div style={{
+        padding: 16, borderRadius: 'var(--radius-lg)',
+        background: 'var(--surface-card)',
+        border: '1px solid var(--border-default)',
+        boxShadow: 'var(--shadow-card)',
+        marginBottom: 24,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Cómo estuvo el día</span>
+          <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+            {todayAlerts > 0 ? `${todayAlerts} alertas` : 'Una tarde tranquila'}
+          </span>
+        </div>
+        <svg width="100%" height="58" viewBox="0 0 322 58" preserveAspectRatio="none" style={{ display: 'block' }}>
+          <defs>
+            <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#DFA251" stopOpacity="0.30" />
+              <stop offset="1" stopColor="#DFA251" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {byHour.length > 0 ? (
+            <>
+              <path d={chart.area} fill="url(#cg)" />
+              <path d={chart.line} fill="none" stroke="#DFA251" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            </>
+          ) : (
+            <rect x="0" y="27" width="322" height="2" rx="1" fill="rgba(223,162,81,0.22)" />
+          )}
+        </svg>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: 'var(--text-disabled)', fontFamily: 'var(--font-mono)' }}>
+          <span>00</span><span>06</span><span>12</span><span>18</span><span>24</span>
+        </div>
+      </div>
+
+      {/* Devices preview */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Tu hogar</span>
+          <button onClick={() => navigate('/cameras')} style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, fontWeight: 500, color: 'var(--accent-dark)' }}>
+            Ver todo <CaretRight size={14} weight="bold" />
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
+          {devices.slice(0, 4).map((d) => (
+            <div key={d.id} style={{
+              display: 'flex', alignItems: 'center', gap: 11,
+              padding: 13, borderRadius: 18,
+              background: 'var(--surface-card)',
+              border: '1px solid var(--border-default)',
+              boxShadow: 'var(--shadow-card)',
+            }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 'var(--radius-sm)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: d.enabled ? 'rgba(126,148,102,0.12)' : 'rgba(168,155,140,0.10)',
+                flexShrink: 0,
+                color: d.enabled ? 'var(--status-safe)' : 'var(--text-tertiary)',
+              }}>
+                {d.device_type === 'tapo_camera' ? <Camera size={18} weight="duotone" /> :
+                 d.device_type === 'verisure_pir' ? <Eye size={18} weight="duotone" /> :
+                 <GearSix size={18} weight="duotone" />}
               </div>
-              <div style={{ fontSize: 36, fontWeight: 800, color: `var(${stat.color})`, lineHeight: 1, letterSpacing: '-0.02em' }}>
-                {stat.value}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {d.name}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: d.enabled ? 'var(--status-safe)' : 'var(--status-offline)' }} />
+                  <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{d.enabled ? 'En línea' : 'Sin señal'}</span>
+                </div>
               </div>
             </div>
           ))}
+          {devices.length === 0 && [0, 1, 2, 3].map((i) => (
+            <div key={i} className="anim-shimmer" style={{ height: 64, borderRadius: 'var(--radius-md)' }} />
+          ))}
         </div>
-
-        {/* Mini chart */}
-        {hourlyData.length > 0 && (
-          <div
-            style={{
-              marginTop: 12,
-              padding: '16px 20px 12px',
-              background: 'var(--surface-raised)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 18,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>Actividad — últimas 24h</span>
-              <span style={{ fontSize: 11, color: 'var(--text-disabled)', fontFamily: 'monospace' }}>
-                {stats?.week.total_events ?? 0} esta semana
-              </span>
-            </div>
-            <ResponsiveContainer width="100%" height={72}>
-              <AreaChart data={hourlyData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="var(--accent-default)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="var(--accent-default)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Tooltip
-                  contentStyle={{
-                    background: 'var(--surface-overlay)',
-                    border: '1px solid var(--border-default)',
-                    borderRadius: 10, fontSize: 11,
-                    color: 'var(--text-primary)',
-                  }}
-                  labelFormatter={(v) => `${v}:00h`}
-                  itemStyle={{ color: 'var(--accent-text)' }}
-                />
-                <Area
-                  type="monotone" dataKey="count"
-                  stroke="var(--accent-default)" fill="url(#chartGrad)"
-                  strokeWidth={2} dot={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
       </div>
 
-      {/* ══ DISPOSITIVOS ══════════════════════════════════ */}
-      {devices.length > 0 && (
-        <div>
-          <SectionLabel>Dispositivos</SectionLabel>
-          <div
-            style={{
-              background: 'var(--surface-raised)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 18,
-              padding: '0 20px',
-              overflow: 'hidden',
-            }}
-          >
-            {devices.slice(0, 4).map((device, idx) => {
-              const lastEvent = events.find((e) => e.device_id === device.device_id)
-              const hasAlert  = lastEvent && lastEvent.alert_level !== 'none'
-              return (
-                <ListRow
-                  key={device.id}
-                  icon={device.device_type === 'tapo_camera' ? Eye : Radio}
-                  iconBg={hasAlert ? 'var(--status-warn-bg)' : 'var(--surface-overlay)'}
-                  iconColor={hasAlert ? 'var(--status-warn)' : 'var(--accent-text)'}
-                  title={device.name}
-                  subtitle={device.zone ?? 'sin zona'}
-                  last={idx === Math.min(devices.length, 4) - 1}
-                  right={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div
-                        style={{
-                          width: 8, height: 8, borderRadius: 4,
-                          background: device.enabled ? 'var(--status-safe)' : 'var(--text-disabled)',
-                        }}
-                      />
-                    </div>
-                  }
-                />
-              )
-            })}
-            <Link
-              to="/cameras"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                padding: '14px 0',
-                fontSize: 13, fontWeight: 500, color: 'var(--accent-text)',
-                borderTop: '1px solid var(--border-subtle)',
-                textDecoration: 'none',
-              }}
-            >
-              Ver todos los dispositivos <ChevronRight size={14} />
-            </Link>
-          </div>
+      {/* Recent events */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Hoy en casa</span>
+          <button onClick={() => navigate('/timeline')} style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, fontWeight: 500, color: 'var(--accent-dark)' }}>
+            Ver todo <CaretRight size={14} weight="bold" />
+          </button>
         </div>
-      )}
-
-      {/* ══ EVENTOS RECIENTES ════════════════════════════ */}
-      <div>
-        <SectionLabel>Eventos recientes</SectionLabel>
-        <div
-          style={{
-            background: 'var(--surface-raised)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 18,
-            overflow: 'hidden',
-          }}
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
           {recentEvents.length === 0 ? (
-            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-disabled)', fontSize: 14 }}>
-              {config ? 'Sheriff monitoreando. Sin eventos.' : 'Cargando...'}
+            <div style={{ textAlign: 'center', padding: '40px 24px', fontSize: 14, color: 'var(--text-tertiary)' }}>
+              Sin eventos recientes
             </div>
-          ) : (
-            <>
-              <AnimatePresence initial={false}>
-                {recentEvents.map((event, idx) => {
-                  const level = event.alert_level
-                  return (
-                    <motion.div
-                      key={event.id}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.04 }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 14,
-                        padding: '14px 20px',
-                        minHeight: 60,
-                        borderLeft: `3px solid var(--level-${level})`,
-                        borderBottom: idx < recentEvents.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-                        background: level !== 'none' ? `var(--level-${level}-bg)` : 'transparent',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'var(--surface-overlay)',
-                        }}
-                      >
-                        <Eye size={16} style={{ color: `var(--level-${level})` }} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {event.device_name ?? event.device_id}
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                          {event.event_type.replace(/_/g, ' ')} · {event.zone ?? '—'}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                        {level !== 'none' && (
-                          <span
-                            style={{
-                              fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                              padding: '2px 8px', borderRadius: 10,
-                              background: `var(--level-${level}-bg)`,
-                              color: `var(--level-${level})`,
-                            }}
-                          >
-                            {level}
-                          </span>
-                        )}
-                        <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--text-disabled)' }}>
-                          {new Date(event.timestamp).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    </motion.div>
-                  )
-                })}
-              </AnimatePresence>
-              <Link
-                to="/timeline"
+          ) : recentEvents.map((ev) => {
+            const lv = alertToLevel(ev.alert_level)
+            return (
+              <button
+                key={ev.id}
+                onClick={() => setEventSheet(ev)}
                 style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  padding: '14px 0',
-                  fontSize: 13, fontWeight: 500, color: 'var(--accent-text)',
-                  borderTop: '1px solid var(--border-subtle)',
-                  textDecoration: 'none',
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  width: '100%', textAlign: 'left',
+                  padding: '13px 14px',
+                  border: '1px solid var(--border-default)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--surface-card)',
+                  boxShadow: 'var(--shadow-card)',
                 }}
               >
-                Ver todos los eventos <ChevronRight size={14} />
-              </Link>
-            </>
-          )}
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: lv.color, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {ev.device_name ?? ev.device_id}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    {ev.zone ? (ZONE_LABELS[ev.zone.toLowerCase()] ?? ev.zone) : 'Sin zona'} · {eventTypeName(ev.event_type)}
+                  </div>
+                </div>
+                <span style={{ fontSize: 12, color: 'var(--text-tertiary)', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
+                  {relTime(ev.timestamp)}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* ══ ZONAS ════════════════════════════════════════ */}
-      {stats?.by_zone && stats.by_zone.length > 0 && (
-        <div>
-          <SectionLabel>Zonas más activas</SectionLabel>
-          <div
-            style={{
-              background: 'var(--surface-raised)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 18,
-              padding: '20px 20px',
-              display: 'flex', flexDirection: 'column', gap: 16,
-            }}
-          >
-            {stats.by_zone.slice(0, 5).map((z) => {
-              const max = stats.by_zone[0]?.count ?? 1
-              const pct = Math.round((z.count / max) * 100)
-              return (
-                <div key={z.zone} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: 80, flexShrink: 0 }}>
-                    <MapPin size={11} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {z.zone}
-                    </span>
-                  </div>
-                  <div style={{ flex: 1, height: 6, background: 'var(--surface-float)', borderRadius: 3, overflow: 'hidden' }}>
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${pct}%` }}
-                      transition={{ duration: 0.8, ease: 'easeOut' }}
-                      style={{
-                        height: '100%', borderRadius: 3,
-                        background: pct > 75 ? 'var(--status-warn)' : 'var(--accent-default)',
-                      }}
-                    />
-                  </div>
-                  <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--text-tertiary)', width: 20, textAlign: 'right', flexShrink: 0 }}>
-                    {z.count}
-                  </span>
+      {/* Zone bars */}
+      {byZone.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 14, fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>
+            Movimiento por zona
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+            {byZone.map((z, i) => (
+              <div key={z.zone} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ width: 84, fontSize: 13, color: 'var(--text-secondary)', flexShrink: 0 }}>
+                  {ZONE_LABELS[z.zone.toLowerCase()] ?? z.zone}
+                </span>
+                <div style={{ flex: 1, height: 9, borderRadius: 'var(--radius-pill)', background: 'rgba(80,60,40,0.06)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 'var(--radius-pill)',
+                    background: ZONE_COLORS[i] ?? 'var(--accent)',
+                    width: `${(z.count / maxZone) * 100}%`,
+                    transition: 'width 600ms ease',
+                  }} />
                 </div>
-              )
-            })}
+                <span style={{ fontSize: 12, color: 'var(--text-tertiary)', width: 32, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
+                  {z.count}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
+      {/* ── Mode Sheet ── */}
+      <BottomSheet open={modeSheetOpen} onClose={() => setModeSheetOpen(false)}>
+        <div style={{ padding: '4px 18px 30px' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, color: 'var(--text-primary)', padding: '6px 4px 4px' }}>
+            ¿Cómo cuido tu casa?
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)', padding: '0 4px 16px' }}>
+            Elige el modo según dónde estés.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {MODES.map((m) => {
+              const meta    = MODE_META[m]
+              const color   = MODE_COLOR_RAW[m]
+              const isActive = m === mode
+              return (
+                <button
+                  key={m}
+                  onClick={() => { updateMode(m); setModeSheetOpen(false) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14, padding: 15,
+                    borderRadius: 'var(--radius-md)',
+                    background: isActive ? `${color}14` : 'var(--surface-card)',
+                    border: `1px solid ${isActive ? `${color}66` : 'var(--border-default)'}`,
+                    textAlign: 'left', transition: 'background var(--transition-base)',
+                  }}
+                >
+                  <span style={{ width: 12, height: 12, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>{meta.label}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 1 }}>{meta.desc}</div>
+                  </div>
+                  {isActive && <Check size={16} weight="bold" style={{ color, flexShrink: 0 }} />}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </BottomSheet>
+
+      {/* ── Event Sheet ── */}
+      <BottomSheet open={!!eventSheet} onClose={() => setEventSheet(null)}>
+        {eventSheet && <EventDetail ev={eventSheet} />}
+      </BottomSheet>
+
+    </div>
+  )
+}
+
+function EventDetail({ ev }: { ev: EventData }) {
+  const lv = alertToLevel(ev.alert_level)
+  const d  = ev.sheriff_decision
+  return (
+    <div style={{ padding: '10px 22px 32px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 18 }}>
+        <div style={{ width: 50, height: 50, borderRadius: 15, background: lv.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Bell size={22} style={{ color: lv.color }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'inline-flex', padding: '3px 10px', borderRadius: 'var(--radius-pill)', background: lv.bg, fontSize: 10, fontWeight: 700, color: lv.text, marginBottom: 6 }}>
+            {lv.label.toUpperCase()}
+          </div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {ev.device_name ?? ev.device_id}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        {[
+          { label: 'ZONA', val: ev.zone ?? '—' },
+          { label: 'DISPOSITIVO', val: ev.device_id },
+          { label: 'HORA', val: fmtTime(ev.timestamp) },
+        ].map((item) => (
+          <div key={item.label} style={{ flex: 1, padding: 11, borderRadius: 'var(--radius-sm)', background: 'var(--surface-input)' }}>
+            <div style={{ fontSize: 9, letterSpacing: '0.5px', color: 'var(--text-tertiary)', marginBottom: 4 }}>{item.label}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.val}</div>
+          </div>
+        ))}
+      </div>
+      {d?.reasoning && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
+            <span style={{ width: 22, height: 22, borderRadius: 8, background: 'radial-gradient(circle at 34% 30%, #E9B968, #DFA251)', display: 'block', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.4px', color: 'var(--accent-dark)' }}>SHERIFF TE CUENTA</span>
+          </div>
+          <div style={{ padding: 14, borderRadius: 15, background: 'var(--level-atencion-bg)', border: '1px solid rgba(223,162,81,0.20)', fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-secondary)' }}>
+            {d.reasoning}
+          </div>
+        </div>
+      )}
+      {d?.message && (
+        <div style={{ fontSize: 15, color: 'var(--text-primary)', fontWeight: 600, lineHeight: 1.45, marginBottom: 16 }}>
+          "{d.message}"
+        </div>
+      )}
+      {d?.recommended_action && (
+        <div style={{ padding: 14, borderRadius: 15, background: 'var(--level-rutina-bg)', border: '1px solid rgba(126,148,102,0.25)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.6px', color: 'var(--status-safe-dark)', marginBottom: 6 }}>QUÉ PUEDES HACER</div>
+          <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--level-rutina-text)' }}>{d.recommended_action}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LoadingSkeleton() {
+  return (
+    <div style={{ padding: '56px 18px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div className="anim-shimmer" style={{ height: 14, width: 120, borderRadius: 7, marginBottom: 10 }} />
+          <div className="anim-shimmer" style={{ height: 26, width: 120, borderRadius: 8 }} />
+        </div>
+        <div className="anim-shimmer" style={{ width: 46, height: 46, borderRadius: '50%' }} />
+      </div>
+      <div className="anim-shimmer" style={{ height: 188, borderRadius: 'var(--radius-2xl)' }} />
+      <div style={{ display: 'flex', gap: 12 }}>
+        <div className="anim-shimmer" style={{ flex: 1, height: 88, borderRadius: 'var(--radius-lg)' }} />
+        <div className="anim-shimmer" style={{ flex: 1, height: 88, borderRadius: 'var(--radius-lg)' }} />
+      </div>
+      <div className="anim-shimmer" style={{ height: 120, borderRadius: 'var(--radius-lg)' }} />
     </div>
   )
 }

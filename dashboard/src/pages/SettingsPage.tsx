@@ -1,244 +1,265 @@
 import { useEffect, useState } from 'react'
-import { useStore } from '../store'
-import { Shield, Server, Bell, Key, Info, ExternalLink } from 'lucide-react'
-import { API } from '../store'
+import { useStore, API } from '../store'
+import { Clock, MapTrifold, CaretRight } from '@phosphor-icons/react'
+import { useNavigate } from 'react-router-dom'
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+export default function SettingsPage() {
+  const config       = useStore((s) => s.config)
+  const health       = useStore((s) => s.health)
+  const sheriffStatus = useStore((s) => s.sheriffStatus)
+  const wsConnected  = useStore((s) => s.wsConnected)
+  const fetchInitial = useStore((s) => s.fetchInitial)
+  const setConfig    = useStore((s) => s.setConfig)
+  const navigate     = useNavigate()
+
+  const [escalation, setEscalation] = useState(true)
+
+  useEffect(() => {
+    if (!config) fetchInitial()
+  }, [config, fetchInitial])
+
+  useEffect(() => {
+    if (config) setEscalation(config.escalation_enabled ?? true)
+  }, [config])
+
+  async function toggleEscalation() {
+    const next = !escalation
+    setEscalation(next)
+    try {
+      const res = await fetch(`${API}/api/v1/sheriff/config`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ escalation_enabled: next }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setConfig(updated)
+      } else {
+        setEscalation(!next)
+      }
+    } catch {
+      setEscalation(!next)
+    }
+  }
+
+  const isMock = health?.mock_sensors ?? true
+  const version = health?.version ?? '—'
+
   return (
-    <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-disabled)', marginBottom: 10, paddingLeft: 2 }}>
+    <div style={{ padding: '54px 18px 16px' }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: '#2C2723', letterSpacing: '-0.4px', marginBottom: 18 }}>
+        Ajustes
+      </div>
+
+      {/* GENERAL */}
+      <Section label="GENERAL">
+        <Card>
+          <NavRow Icon={Clock} label="Rutinas y viajes" onClick={() => navigate('/schedules')} />
+          <NavRow Icon={MapTrifold} label="Zonas y dispositivos" onClick={() => navigate('/cameras')} divider />
+        </Card>
+      </Section>
+
+      {/* SHERIFF */}
+      <Section label="SHERIFF">
+        <Card>
+          <Row label="Inteligencia">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: sheriffStatus?.claude_available ? '#7E9466' : '#ADA293',
+              }} />
+              <span style={{ fontSize: 13, color: sheriffStatus?.claude_available ? '#5E7349' : '#ADA293' }}>
+                {sheriffStatus?.claude_available ? 'Claude · activo' : 'No disponible'}
+              </span>
+            </div>
+          </Row>
+          <Row label="Tono de avisos" divider>
+            <span style={{ fontSize: 13, color: '#7A7065' }}>Tranquilo</span>
+          </Row>
+          <Row label="Espera entre avisos" divider>
+            <span style={{ fontSize: 13, color: '#7A7065', fontVariantNumeric: 'tabular-nums' }}>
+              {config ? `${(config.cooldown_minutes ?? 1.5) * 60} s` : '90 s'}
+            </span>
+          </Row>
+          <Row label="Escalar lo importante" divider>
+            <Toggle value={escalation} onChange={toggleEscalation} />
+          </Row>
+        </Card>
+      </Section>
+
+      {/* SISTEMA */}
+      <Section label="SISTEMA">
+        <Card>
+          <Row label="Versión">
+            <span style={{ fontSize: 13, color: '#7A7065', fontVariantNumeric: 'tabular-nums' }}>
+              v{version}
+            </span>
+          </Row>
+          <Row label="Modo de sensores" divider>
+            <span style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.5px',
+              color: '#B47B2A', background: 'rgba(223,162,81,0.14)',
+              padding: '3px 9px', borderRadius: 9999,
+            }}>
+              {isMock ? 'MOCK' : 'LIVE'}
+            </span>
+          </Row>
+          <Row label="Servicios" divider>
+            <span style={{ fontSize: 13, color: '#5E7349' }}>
+              {health?.services ? `${Object.values(health.services).filter((s: any) => s.running).length} activos` : '— activos'}
+            </span>
+          </Row>
+          <Row label="Conexión" divider>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: wsConnected ? '#7E9466' : '#ADA293',
+              }} />
+              <span style={{ fontSize: 13, color: wsConnected ? '#5E7349' : '#ADA293' }}>
+                {wsConnected ? 'WebSocket' : 'Desconectado'}
+              </span>
+            </div>
+          </Row>
+        </Card>
+      </Section>
+
+      {/* CREDENCIALES */}
+      <Section label="CREDENCIALES">
+        <Card>
+          <Row label="Anthropic API">
+            <span style={{ fontSize: 13, color: '#ADA293' }}>sk-ant-••••4f2a</span>
+          </Row>
+          <Row label="Tapo Cloud" divider>
+            <span style={{ fontSize: 13, color: '#5E7349' }}>•••• conectado</span>
+          </Row>
+          <Row label="Verisure" divider>
+            <span style={{ fontSize: 13, color: '#5E7349' }}>•••• conectado</span>
+          </Row>
+        </Card>
+      </Section>
+
+      {/* NOTIFICACIONES */}
+      <Section label="NOTIFICACIONES">
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14 }}>
+            <span style={{ fontSize: 14, color: '#2C2723' }}>Avisos en el teléfono</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 13, color: '#ADA293' }}>No activo</span>
+              <button style={{
+                fontSize: 12, fontWeight: 600, color: '#B47B2A',
+                background: 'rgba(223,162,81,0.14)', border: '1px solid rgba(223,162,81,0.28)',
+                padding: '5px 12px', borderRadius: 9999, cursor: 'pointer',
+              }}>
+                Activar
+              </button>
+            </div>
+          </div>
+        </Card>
+      </Section>
+
+      {/* ACERCA DE */}
+      <Section label="ACERCA DE">
+        <Card>
+          <Row label="Sheriff Home">
+            <span style={{ fontSize: 13, color: '#7A7065' }}>PWA local</span>
+          </Row>
+          <Row label="Corre en" divider>
+            <span style={{ fontSize: 13, color: '#7A7065' }}>Orange Pi 5</span>
+          </Row>
+          <Row label="Build" divider>
+            <span style={{ fontSize: 11, color: '#ADA293', fontFamily: 'var(--font-mono)' }}>
+              {new Date(__BUILD_TIME__).toLocaleDateString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </Row>
+        </Card>
+        <div style={{ textAlign: 'center', padding: '16px 0 4px', fontSize: 11, color: '#C2B6A4' }}>
+          Hecho con calma · Lima, Perú
+        </div>
+      </Section>
+    </div>
+  )
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ margin: '0 0 18px' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.8px', color: '#ADA293', padding: '0 4px 8px' }}>
+        {label}
+      </div>
       {children}
     </div>
   )
 }
 
-function Row({
-  icon: Icon,
-  iconColor = '--text-tertiary',
-  label,
-  value,
-  valueOk,
-  last = false,
-  action,
-}: {
-  icon?: React.ElementType
-  iconColor?: string
-  label: string
-  value?: string
-  valueOk?: boolean | null
-  last?: boolean
-  action?: React.ReactNode
-}) {
-  const valueColor = valueOk === true
-    ? 'var(--status-safe)'
-    : valueOk === false
-    ? 'var(--status-alert)'
-    : 'var(--text-secondary)'
-
+function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        display: 'flex', alignItems: 'center', gap: 14,
-        padding: '15px 20px', minHeight: 60,
-        borderBottom: last ? 'none' : '1px solid var(--border-subtle)',
-      }}
-    >
-      {Icon && (
-        <div style={{
-          width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'var(--surface-overlay)',
-        }}>
-          <Icon size={16} style={{ color: `var(${iconColor})` }} />
-        </div>
-      )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 15, fontWeight: 400, color: 'var(--text-primary)' }}>{label}</span>
-      </div>
-      {action ?? (
-        value !== undefined && (
-          <span style={{ fontSize: 13, fontFamily: 'monospace', color: valueColor, textAlign: 'right', maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {value}
-          </span>
-        )
-      )}
+    <div style={{
+      borderRadius: 18, background: '#FFFCF6',
+      border: '1px solid rgba(80,60,40,0.08)',
+      overflow: 'hidden',
+      boxShadow: '0 6px 18px rgba(80,55,25,0.04)',
+    }}>
+      {children}
     </div>
   )
 }
 
-export default function SettingsPage() {
-  const health        = useStore((s) => s.health)
-  const sheriffStatus = useStore((s) => s.sheriffStatus)
-  const config        = useStore((s) => s.config)
-  const fetchInitial  = useStore((s) => s.fetchInitial)
-
-  const [pushSupported] = useState('serviceWorker' in navigator && 'PushManager' in window)
-  const [pushPermission, setPushPermission] = useState(Notification.permission)
-  const [vapidKey, setVapidKey]             = useState('')
-  const [requestingPush, setRequestingPush] = useState(false)
-
-  useEffect(() => {
-    if (!health) fetchInitial()
-    fetchVapidKey()
-  }, [health, fetchInitial])
-
-  async function fetchVapidKey() {
-    try {
-      const res = await fetch(`${API}/api/v1/push/vapid-key`)
-      if (res.ok) { const d = await res.json(); setVapidKey(d.public_key ?? '') }
-    } catch { /* silent */ }
-  }
-
-  async function enablePush() {
-    if (!pushSupported || !vapidKey) return
-    setRequestingPush(true)
-    try {
-      const permission = await Notification.requestPermission()
-      setPushPermission(permission)
-      if (permission !== 'granted') return
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
-      })
-      await fetch(`${API}/api/v1/push/subscribe`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh') as ArrayBuffer))),
-            auth:   btoa(String.fromCharCode(...new Uint8Array(sub.getKey('auth') as ArrayBuffer))),
-          },
-          device_label: navigator.userAgent.slice(0, 50),
-        }),
-      })
-    } catch (e) { console.error('Push error:', e) }
-    setRequestingPush(false)
-  }
-
-  function urlBase64ToUint8Array(b64: string) {
-    const padding = '='.repeat((4 - b64.length % 4) % 4)
-    const base64  = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/')
-    const raw     = window.atob(base64)
-    return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)))
-  }
-
+function Row({ label, divider, children }: { label: string; divider?: boolean; children?: React.ReactNode }) {
   return (
-    <div style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 36 }}>
-
-      {/* Header */}
-      <div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: 4 }}>
-          Ajustes
-        </h1>
-        <p style={{ fontSize: 14, color: 'var(--text-tertiary)' }}>
-          Configuración del sistema
-        </p>
-      </div>
-
-      {/* Sheriff IA */}
-      <div>
-        <SectionLabel>Sheriff IA</SectionLabel>
-        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 18, overflow: 'hidden' }}>
-          <Row icon={Shield} iconColor="--accent-text" label="Modo actual" value={config?.mode?.toUpperCase() ?? '—'} />
-          <Row icon={Shield} label="Claude" value={sheriffStatus?.claude_available ? 'Disponible ✓' : 'Sin API key'} valueOk={sheriffStatus?.claude_available} />
-          <Row icon={Shield} label="OpenAI" value={sheriffStatus?.openai_available ? 'Disponible ✓' : 'Sin API key'} valueOk={sheriffStatus?.openai_available} />
-          <Row label="Cooldown" value={`${config?.cooldown_minutes ?? '—'} min`} />
-          <Row label="Escalación" value={config?.escalation_enabled ? 'Activada' : 'Desactivada'} last />
-        </div>
-      </div>
-
-      {/* Sistema */}
-      <div>
-        <SectionLabel>Sistema</SectionLabel>
-        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 18, overflow: 'hidden' }}>
-          <Row icon={Server} iconColor="--text-secondary" label="Versión backend" value={health?.version ?? '—'} />
-          <Row label="Sensores" value={health?.mock_sensors ? 'MOCK (simulación)' : 'LIVE (hardware)'} valueOk={!health?.mock_sensors} />
-          <Row label="RF service" value={(health?.services?.rf as { running?: boolean })?.running ? 'Activo' : 'Inactivo'} valueOk={(health?.services?.rf as { running?: boolean })?.running} />
-          <Row label="Tapo service" value={(health?.services?.tapo as { running?: boolean })?.running ? 'Activo' : 'Inactivo'} valueOk={(health?.services?.tapo as { running?: boolean })?.running} />
-          <Row label="Orange Pi" value="192.168.68.100" last />
-        </div>
-      </div>
-
-      {/* Variables de entorno */}
-      <div>
-        <SectionLabel>Credenciales</SectionLabel>
-        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 18, overflow: 'hidden' }}>
-          <Row icon={Key} iconColor="--status-safe" label="ANTHROPIC_API_KEY" value={sheriffStatus?.claude_available ? '••••••••' : 'No configurada'} valueOk={sheriffStatus?.claude_available} />
-          <Row label="OPENAI_API_KEY" value={sheriffStatus?.openai_available ? '••••••••' : 'No configurada'} valueOk={sheriffStatus?.openai_available} />
-          <Row label="VAPID_PUBLIC_KEY" value={vapidKey ? '••••••••' : 'No configurada'} valueOk={!!vapidKey} />
-          <Row label="MOCK_SENSORS" value={health?.mock_sensors ? 'true' : 'false'} last />
-        </div>
-      </div>
-
-      {/* Notificaciones Push */}
-      <div>
-        <SectionLabel>Notificaciones Push</SectionLabel>
-        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 18, overflow: 'hidden' }}>
-          <Row
-            icon={Bell} iconColor="--status-warn"
-            label="Soporte Web Push"
-            value={pushSupported ? 'Soportado' : 'No soportado'}
-            valueOk={pushSupported}
-          />
-          <Row
-            label="Permiso"
-            value={pushPermission}
-            valueOk={pushPermission === 'granted' ? true : pushPermission === 'denied' ? false : null}
-          />
-          <Row
-            label="VAPID key"
-            value={vapidKey ? 'Configurada ✓' : 'No configurada'}
-            valueOk={!!vapidKey}
-            last={!(pushSupported && pushPermission !== 'granted' && vapidKey)}
-          />
-          {pushSupported && pushPermission !== 'granted' && vapidKey && (
-            <div style={{ padding: '16px 20px' }}>
-              <button
-                onClick={enablePush}
-                disabled={requestingPush}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: 16, cursor: 'pointer',
-                  fontSize: 15, fontWeight: 600,
-                  background: 'var(--status-warn)', color: 'var(--surface-base)',
-                  opacity: requestingPush ? 0.5 : 1,
-                }}
-              >
-                {requestingPush ? 'Configurando...' : 'Activar notificaciones push'}
-              </button>
-            </div>
-          )}
-          {pushPermission === 'granted' && (
-            <div style={{ padding: '12px 20px', textAlign: 'center', fontSize: 13, color: 'var(--status-safe)' }}>
-              ✓ Notificaciones activas
-            </div>
-          )}
-        </div>
-        {!pushSupported && (
-          <div style={{ marginTop: 10, padding: '0 4px', fontSize: 12, color: 'var(--text-disabled)', lineHeight: 1.5 }}>
-            iOS: instala desde Safari → Compartir → Añadir a pantalla de inicio (iOS 16.4+).
-          </div>
-        )}
-      </div>
-
-      {/* Acerca de */}
-      <div>
-        <SectionLabel>Acerca de</SectionLabel>
-        <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 18, overflow: 'hidden' }}>
-          <Row icon={Info} iconColor="--text-disabled" label="Sheriff Home" value="v0.2.0" />
-          <Row label="Alonso Javier · Lima · 2026" last
-            action={
-              <a
-                href="https://github.com/alonsix33/VerisureSix6"
-                target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--accent-text)', textDecoration: 'none' }}
-              >
-                GitHub <ExternalLink size={12} />
-              </a>
-            }
-          />
-        </div>
-      </div>
-
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: 14,
+      borderTop: divider ? '1px solid rgba(80,60,40,0.06)' : 'none',
+    }}>
+      <span style={{ fontSize: 14, color: '#2C2723' }}>{label}</span>
+      {children}
     </div>
+  )
+}
+
+function NavRow({ Icon, label, onClick, divider }: {
+  Icon: React.ElementType; label: string; onClick: () => void; divider?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 13,
+        width: '100%', textAlign: 'left', padding: 14,
+        background: 'none', border: 'none', cursor: 'pointer',
+        borderTop: divider ? '1px solid rgba(80,60,40,0.06)' : 'none',
+      }}
+    >
+      <span style={{ display: 'flex', color: '#B47B2A' }}>
+        <Icon size={17} />
+      </span>
+      <span style={{ flex: 1, fontSize: 14, color: '#2C2723' }}>{label}</span>
+      <span style={{ display: 'flex', color: '#ADA293' }}>
+        <CaretRight size={15} />
+      </span>
+    </button>
+  )
+}
+
+function Toggle({ value, onChange }: { value: boolean; onChange: () => void }) {
+  return (
+    <button
+      onClick={onChange}
+      style={{
+        width: 44, height: 26, borderRadius: 9999, flexShrink: 0,
+        background: value ? '#DFA251' : 'rgba(80,60,40,0.16)',
+        position: 'relative', transition: 'background 220ms ease',
+        border: 'none', cursor: 'pointer',
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: 3,
+        left: value ? 21 : 3,
+        width: 20, height: 20, borderRadius: '50%',
+        background: '#fff',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        transition: 'left 220ms ease',
+      }} />
+    </button>
   )
 }

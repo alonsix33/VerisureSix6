@@ -1,350 +1,331 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '../store'
-import type { Schedule, SheriffMode } from '../types'
-import { Plus, Trash2, CalendarDays, Plane, X } from 'lucide-react'
-import { API } from '../store'
+import { Plus, ArrowLeft, Airplane } from '@phosphor-icons/react'
+import { useNavigate } from 'react-router-dom'
+import BottomSheet from '../components/BottomSheet'
+import { MODE_COLOR_RAW } from '../lib/design'
+import type { Schedule } from '../types'
 
-const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-const MODES: SheriffMode[] = ['casa', 'fuera', 'noche', 'viaje', 'off']
-const MODE_COLOR: Record<string, string> = {
-  casa: '#00D084', fuera: '#FFB800', noche: '#A78BFA', viaje: '#FF3B3B', off: '#4A4A60',
+const DAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+
+const MODE_LABELS: Record<string, string> = {
+  off: 'Apagado', monitor: 'Monitor', casa: 'Casa',
+  fuera: 'Fuera', noche: 'Noche', viaje: 'Viaje',
 }
 
-export default function SchedulesPage() {
-  const schedules    = useStore((s) => s.schedules)
-  const travelPeriods = useStore((s) => s.travelPeriods)
-  const fetchSchedules = useStore((s) => s.fetchSchedules)
-  const fetchTravel  = useStore((s) => s.fetchTravelPeriods)
+const TRAVEL_CARDS = [
+  { id: 'weekend', label: 'Fin de semana', from: 'vie 20:00', to: 'dom 22:00' },
+  { id: 'vacation', label: 'Vacaciones', from: 'Variable', to: 'Variable' },
+]
 
-  const [showScheduleForm, setShowScheduleForm] = useState(false)
-  const [showTravelForm, setShowTravelForm] = useState(false)
+export default function SchedulesPage() {
+  const schedules       = useStore((s) => s.schedules)
+  const loading         = useStore((s) => s.loading)
+  const fetchSchedules  = useStore((s) => s.fetchSchedules)
+  const navigate        = useNavigate()
+
+  const [createOpen, setCreateOpen]           = useState(false)
+  const [createTravelOpen, setCreateTravelOpen] = useState(false)
+  const [form, setForm] = useState({ name: '', mode: 'fuera', time: '08:00', days: [0, 1, 2, 3, 4] as number[] })
 
   useEffect(() => {
-    fetchSchedules()
-    fetchTravel()
-  }, [fetchSchedules, fetchTravel])
+    fetchSchedules?.()
+  }, [fetchSchedules])
 
-  async function deleteSchedule(id: string) {
-    await fetch(`${API}/api/v1/schedules/${id}`, { method: 'DELETE' })
-    fetchSchedules()
-  }
-
-  async function toggleSchedule(schedule: Schedule) {
-    await fetch(`${API}/api/v1/schedules/${schedule.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: !schedule.is_active }),
-    })
-    fetchSchedules()
-  }
-
-  async function deleteTravel(id: string) {
-    await fetch(`${API}/api/v1/travel/${id}`, { method: 'DELETE' })
-    fetchTravel()
+  function toggleDay(idx: number) {
+    setForm((prev) => ({
+      ...prev,
+      days: prev.days.includes(idx) ? prev.days.filter((d) => d !== idx) : [...prev.days, idx].sort(),
+    }))
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white">Horarios & Automatización</h1>
-        <p className="text-xs text-[#8080A0] mt-0.5">Programar cambios de modo automáticos</p>
+    <div style={{ paddingBottom: 104 }}>
+
+      {/* Header */}
+      <div style={{ padding: '54px 18px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button
+          onClick={() => navigate(-1)}
+          style={{ width: 36, height: 36, borderRadius: 12, background: '#FFFCF6', border: '1px solid rgba(80,60,40,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7A7065', flexShrink: 0 }}
+        >
+          <ArrowLeft size={17} />
+        </button>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 21, fontWeight: 700, color: '#2C2723' }}>
+          Rutinas
+        </div>
       </div>
 
-      {/* ── Schedules ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <CalendarDays size={16} className="text-[#3B82F6]" />
-            <span className="text-sm font-semibold text-white">Horarios semanales</span>
-          </div>
-          <button
-            onClick={() => setShowScheduleForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1A2040] border border-[#3B82F6]/30 text-xs text-[#3B82F6] hover:bg-[#1E2650] transition-all"
-          >
-            <Plus size={12} /> Nuevo
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          {schedules.length === 0 ? (
-            <div className="text-center py-8 text-[#4A4A60] text-sm bg-[#12121A] border border-[#1A1A24] rounded-2xl">
-              Sin horarios configurados
-            </div>
-          ) : (
-            schedules.map((s) => (
-              <motion.div
-                key={s.id}
-                layout
-                className="bg-[#12121A] border border-[#1A1A24] rounded-xl p-4 flex items-center gap-3"
-              >
-                <div
-                  className="w-3 h-3 rounded-full shrink-0"
-                  style={{ background: MODE_COLOR[s.mode] ?? '#4A4A60' }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-white">{s.name}</span>
-                    <span
-                      className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                      style={{ background: `${MODE_COLOR[s.mode]}20`, color: MODE_COLOR[s.mode] }}
-                    >
-                      {s.mode}
-                    </span>
+      {/* Cuando viajas */}
+      <div style={{ padding: '18px 18px 0' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#7A7065', marginBottom: 12 }}>Cuando viajas</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {TRAVEL_CARDS.map((card) => (
+            <div
+              key={card.id}
+              style={{
+                position: 'relative', padding: 16, borderRadius: 20, overflow: 'hidden',
+                background: 'linear-gradient(135deg, #C26248, #D98A3D)',
+                boxShadow: '0 12px 28px rgba(180,80,50,0.22)',
+              }}
+            >
+              <div style={{ position: 'absolute', top: -30, right: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.12)' }} />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                  <div style={{ width: 42, height: 42, borderRadius: 13, background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Airplane size={20} weight="duotone" style={{ color: '#FFF8EF' }} />
                   </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs text-[#8080A0] font-mono">{s.start_time} – {s.end_time}</span>
-                    <div className="flex gap-0.5">
-                      {DAYS.map((day, i) => (
-                        <span
-                          key={day}
-                          className="text-[10px] px-1 rounded"
-                          style={{
-                            background: s.days_of_week.includes(i) ? `${MODE_COLOR[s.mode]}20` : 'transparent',
-                            color: s.days_of_week.includes(i) ? MODE_COLOR[s.mode] : '#3A3A50',
-                          }}
-                        >
-                          {day}
-                        </span>
-                      ))}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#FFF8EF' }}>{card.label}</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,248,239,0.8)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                      {card.from} — {card.to}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => toggleSchedule(s)}
-                    className={`w-10 h-6 rounded-full transition-all relative ${s.is_active ? 'bg-[#00D084]' : 'bg-[#23232F]'}`}
-                  >
-                    <span
-                      className="absolute top-1 w-4 h-4 bg-white rounded-full transition-all"
-                      style={{ left: s.is_active ? '22px' : '2px' }}
-                    />
-                  </button>
-                  <button
-                    onClick={() => deleteSchedule(s.id)}
-                    className="text-[#4A4A60] hover:text-[#FF3B3B] transition-colors"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </motion.div>
-            ))
-          )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Travel periods ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Plane size={16} className="text-[#FFB800]" />
-            <span className="text-sm font-semibold text-white">Periodos de viaje</span>
+      {/* Tu semana */}
+      <div style={{ padding: '24px 18px 0' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#7A7065', marginBottom: 12 }}>Tu semana</div>
+        {loading ? (
+          <LoadingSkeleton />
+        ) : !schedules || schedules.length === 0 ? (
+          <EmptySchedules />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {schedules.map((sch) => (
+              <ScheduleCard key={sch.id} schedule={sch} />
+            ))}
           </div>
+        )}
+      </div>
+
+      {/* Create buttons */}
+      <div style={{ padding: '20px 18px 0', display: 'flex', gap: 11 }}>
+        <button
+          onClick={() => setCreateOpen(true)}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: 14, borderRadius: 16,
+            background: 'rgba(223,162,81,0.14)', border: '1px solid rgba(223,162,81,0.3)',
+            color: '#B47B2A', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          <Plus size={14} weight="bold" /> Rutina
+        </button>
+        <button
+          onClick={() => setCreateTravelOpen(true)}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: 14, borderRadius: 16,
+            background: 'rgba(194,98,72,0.12)', border: '1px solid rgba(194,98,72,0.28)',
+            color: '#B05A40', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          <Plus size={14} weight="bold" style={{ color: '#C26248' }} /> Viaje
+        </button>
+      </div>
+
+      {/* Create rutina sheet */}
+      <BottomSheet open={createOpen} onClose={() => setCreateOpen(false)}>
+        <div style={{ padding: '10px 22px 34px' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: '#2C2723', marginBottom: 18 }}>
+            Nueva rutina
+          </div>
+
+          <label style={{ display: 'block', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: '#ADA293', marginBottom: 7, textTransform: 'uppercase' }}>Nombre</div>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder="Ej. Salida al trabajo"
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 'var(--radius-md)', background: 'var(--surface-input)', border: '1px solid var(--border-medium)', color: '#2C2723', fontSize: 14, fontFamily: 'var(--font-ui)', outline: 'none' }}
+            />
+          </label>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: '#ADA293', marginBottom: 7, textTransform: 'uppercase' }}>Modo</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {Object.entries(MODE_LABELS).map(([m, label]) => {
+                const active = form.mode === m
+                const color = MODE_COLOR_RAW[m] ?? '#DFA251'
+                return (
+                  <button
+                    key={m}
+                    onClick={() => setForm((p) => ({ ...p, mode: m }))}
+                    style={{
+                      padding: '7px 14px', borderRadius: 9999,
+                      fontSize: 13, fontWeight: active ? 700 : 400,
+                      border: active ? `1.5px solid ${color}` : '1px solid rgba(80,60,40,0.15)',
+                      background: active ? `${color}20` : 'var(--surface-card)',
+                      color: active ? color : '#7A7065', cursor: 'pointer',
+                    }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <label style={{ display: 'block', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: '#ADA293', marginBottom: 7, textTransform: 'uppercase' }}>Hora</div>
+            <input
+              type="time"
+              value={form.time}
+              onChange={(e) => setForm((p) => ({ ...p, time: e.target.value }))}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 'var(--radius-md)', background: 'var(--surface-input)', border: '1px solid var(--border-medium)', color: '#2C2723', fontSize: 14, fontFamily: 'var(--font-mono)', outline: 'none' }}
+            />
+          </label>
+
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: '#ADA293', marginBottom: 7, textTransform: 'uppercase' }}>Días</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {DAYS.map((d, i) => {
+                const active = form.days.includes(i)
+                return (
+                  <button
+                    key={d}
+                    onClick={() => toggleDay(i)}
+                    style={{
+                      flex: 1, aspectRatio: '1', borderRadius: 10,
+                      fontSize: 13, fontWeight: active ? 700 : 400,
+                      background: active ? '#DFA251' : 'var(--surface-input)',
+                      color: active ? '#2C2723' : '#ADA293',
+                      border: active ? '1.5px solid #DFA251' : '1px solid rgba(80,60,40,0.15)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {d}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <button
-            onClick={() => setShowTravelForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1A1100] border border-[#FFB800]/30 text-xs text-[#FFB800] hover:bg-[#201500] transition-all"
+            onClick={() => setCreateOpen(false)}
+            style={{ width: '100%', padding: '14px 0', borderRadius: 'var(--radius-md)', background: '#DFA251', color: '#2C2723', fontWeight: 700, fontSize: 15, boxShadow: '0 4px 14px rgba(223,162,81,0.30)', border: 'none', cursor: 'pointer' }}
           >
-            <Plus size={12} /> Nuevo viaje
+            Guardar rutina
           </button>
         </div>
+      </BottomSheet>
 
-        <div className="space-y-2">
-          {travelPeriods.length === 0 ? (
-            <div className="text-center py-8 text-[#4A4A60] text-sm bg-[#12121A] border border-[#1A1A24] rounded-2xl">
-              Sin viajes programados
-            </div>
-          ) : (
-            travelPeriods.map((t) => {
-              const start = new Date(t.start_date + 'T00:00:00')
-              const end   = new Date(t.end_date + 'T00:00:00')
-              const now   = new Date()
-              const active = now >= start && now <= end
-              return (
-                <motion.div
-                  key={t.id}
-                  layout
-                  className="bg-[#12121A] border border-[#1A1A24] rounded-xl p-4 flex items-center gap-3"
-                >
-                  <Plane size={18} className={active ? 'text-[#FFB800]' : 'text-[#4A4A60]'} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">{t.name}</span>
-                      {active && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FFB800]20 text-[#FFB800] animate-pulse">
-                          EN CURSO
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-[#8080A0] font-mono mt-1">
-                      {start.toLocaleDateString('es-PE')} → {end.toLocaleDateString('es-PE')}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => deleteTravel(t.id)}
-                    className="text-[#4A4A60] hover:text-[#FF3B3B] transition-colors shrink-0"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </motion.div>
-              )
-            })
-          )}
+      {/* Create travel sheet */}
+      <BottomSheet open={createTravelOpen} onClose={() => setCreateTravelOpen(false)}>
+        <div style={{ padding: '10px 22px 34px' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: '#2C2723', marginBottom: 6 }}>
+            Período de viaje
+          </div>
+          <div style={{ fontSize: 13, color: '#7A7065', marginBottom: 20 }}>
+            Sheriff activará modo Viaje automáticamente en estas fechas.
+          </div>
+          <label style={{ display: 'block', marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: '#ADA293', marginBottom: 7, textTransform: 'uppercase' }}>Nombre</div>
+            <input placeholder="Ej. Navidad en familia" style={{ width: '100%', padding: '12px 14px', borderRadius: 'var(--radius-md)', background: 'var(--surface-input)', border: '1px solid var(--border-medium)', color: '#2C2723', fontSize: 14, fontFamily: 'var(--font-ui)', outline: 'none' }} />
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+            <label>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: '#ADA293', marginBottom: 7, textTransform: 'uppercase' }}>Desde</div>
+              <input type="date" style={{ width: '100%', padding: '12px 14px', borderRadius: 'var(--radius-md)', background: 'var(--surface-input)', border: '1px solid var(--border-medium)', color: '#2C2723', fontSize: 13, fontFamily: 'var(--font-mono)', outline: 'none' }} />
+            </label>
+            <label>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: '#ADA293', marginBottom: 7, textTransform: 'uppercase' }}>Hasta</div>
+              <input type="date" style={{ width: '100%', padding: '12px 14px', borderRadius: 'var(--radius-md)', background: 'var(--surface-input)', border: '1px solid var(--border-medium)', color: '#2C2723', fontSize: 13, fontFamily: 'var(--font-mono)', outline: 'none' }} />
+            </label>
+          </div>
+          <button
+            onClick={() => setCreateTravelOpen(false)}
+            style={{ width: '100%', padding: '14px 0', borderRadius: 'var(--radius-md)', background: '#C26248', color: '#FFF8EF', fontWeight: 700, fontSize: 15, border: 'none', cursor: 'pointer' }}
+          >
+            Guardar período
+          </button>
         </div>
-      </div>
+      </BottomSheet>
 
-      {/* Schedule form modal */}
-      <AnimatePresence>
-        {showScheduleForm && (
-          <ScheduleForm
-            onClose={() => setShowScheduleForm(false)}
-            onSave={() => { setShowScheduleForm(false); fetchSchedules() }}
-          />
-        )}
-        {showTravelForm && (
-          <TravelForm
-            onClose={() => setShowTravelForm(false)}
-            onSave={() => { setShowTravelForm(false); fetchTravel() }}
-          />
-        )}
-      </AnimatePresence>
     </div>
   )
 }
 
-function ScheduleForm({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [name, setName] = useState('')
-  const [mode, setMode] = useState<SheriffMode>('fuera')
-  const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5])
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime] = useState('18:00')
-  const [saving, setSaving] = useState(false)
-
-  function toggleDay(d: number) {
-    setDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])
-  }
-
-  async function save() {
-    if (!name.trim()) return
-    setSaving(true)
-    await fetch(`${API}/api/v1/schedules`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, mode, days_of_week: days, start_time: startTime, end_time: endTime }),
-    })
-    setSaving(false)
-    onSave()
-  }
-
+function ScheduleCard({ schedule: s }: { schedule: Schedule }) {
+  const color = MODE_COLOR_RAW[s.mode] ?? '#DFA251'
+  const modeLabel = MODE_LABELS[s.mode] ?? s.mode
   return (
-    <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/70 z-50" onClick={onClose} />
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className="fixed bottom-0 left-0 right-0 z-50 bg-[#12121A] border-t border-[#23232F] rounded-t-2xl p-5 space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-bold text-white">Nuevo horario</span>
-          <button onClick={onClose}><X size={18} className="text-[#4A4A60]" /></button>
+    <div style={{
+      padding: 15, borderRadius: 18,
+      background: '#FFFCF6', border: '1px solid rgba(80,60,40,0.08)',
+      boxShadow: '0 6px 18px rgba(80,55,25,0.05)',
+      opacity: s.is_active ? 1 : 0.6,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#2C2723' }}>
+            {s.name || modeLabel}
+          </span>
         </div>
-        <input
-          value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre del horario"
-          className="w-full bg-[#0E0E16] border border-[#23232F] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#4A4A60] focus:outline-none focus:border-[#3B82F6]/50"
-        />
-        <div>
-          <div className="text-xs text-[#8080A0] mb-2">Modo</div>
-          <div className="flex gap-2 flex-wrap">
-            {MODES.map((m) => (
-              <button key={m} onClick={() => setMode(m)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase"
-                style={{ background: mode === m ? `${MODE_COLOR[m]}25` : 'transparent', color: mode === m ? MODE_COLOR[m] : '#4A4A60', border: `1px solid ${mode === m ? MODE_COLOR[m] + '40' : '#23232F'}` }}
-              >{m}</button>
-            ))}
-          </div>
+        <div style={{
+          width: 44, height: 26, borderRadius: 9999, position: 'relative', flexShrink: 0,
+          background: s.is_active ? '#DFA251' : 'rgba(80,60,40,0.16)',
+          transition: 'background 200ms ease',
+        }}>
+          <span style={{
+            position: 'absolute', top: 3, left: s.is_active ? 21 : 3,
+            width: 20, height: 20, borderRadius: '50%',
+            background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+            transition: 'left 200ms ease',
+          }} />
         </div>
-        <div>
-          <div className="text-xs text-[#8080A0] mb-2">Días</div>
-          <div className="flex gap-1.5">
-            {DAYS.map((d, i) => (
-              <button key={d} onClick={() => toggleDay(i)}
-                className="w-9 h-9 rounded-lg text-xs font-bold transition-all"
-                style={{ background: days.includes(i) ? `${MODE_COLOR[mode]}20` : '#0E0E16', color: days.includes(i) ? MODE_COLOR[mode] : '#4A4A60', border: `1px solid ${days.includes(i) ? MODE_COLOR[mode] + '40' : '#23232F'}` }}
-              >{d}</button>
-            ))}
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <div className="text-xs text-[#8080A0] mb-1">Inicio</div>
-            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-              className="w-full bg-[#0E0E16] border border-[#23232F] rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none" />
-          </div>
-          <div className="flex-1">
-            <div className="text-xs text-[#8080A0] mb-1">Fin</div>
-            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-              className="w-full bg-[#0E0E16] border border-[#23232F] rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none" />
-          </div>
-        </div>
-        <button onClick={save} disabled={!name.trim() || saving}
-          className="w-full py-3 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] disabled:opacity-50 text-white text-sm font-bold transition-all">
-          {saving ? 'Guardando...' : 'Guardar horario'}
-        </button>
-      </motion.div>
-    </>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 13 }}>
+        <span style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: 9999, background: `${color}20`, fontSize: 11, fontWeight: 600, color }}>
+          {modeLabel}
+        </span>
+        <span style={{ fontSize: 12, color: '#7A7065', fontVariantNumeric: 'tabular-nums' }}>
+          {s.start_time}{s.end_time ? ` – ${s.end_time}` : ''}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 5, marginTop: 12 }}>
+        {DAYS.map((d, i) => {
+          const active = s.days_of_week.includes(i)
+          return (
+            <span
+              key={d}
+              style={{
+                width: 25, height: 25, borderRadius: 8,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 600,
+                background: active ? `${color}22` : 'var(--surface-input)',
+                color: active ? color : '#ADA293',
+              }}
+            >
+              {d}
+            </span>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
-function TravelForm({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [name, setName] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  async function save() {
-    if (!name.trim() || !startDate || !endDate) return
-    setSaving(true)
-    await fetch(`${API}/api/v1/travel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, start_date: startDate, end_date: endDate }),
-    })
-    setSaving(false)
-    onSave()
-  }
-
+function EmptySchedules() {
   return (
-    <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/70 z-50" onClick={onClose} />
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className="fixed bottom-0 left-0 right-0 z-50 bg-[#12121A] border-t border-[#23232F] rounded-t-2xl p-5 space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-bold text-white">Nuevo viaje</span>
-          <button onClick={onClose}><X size={18} className="text-[#4A4A60]" /></button>
-        </div>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre (ej: Japón 2026)"
-          className="w-full bg-[#0E0E16] border border-[#23232F] rounded-xl px-4 py-2.5 text-sm text-white placeholder-[#4A4A60] focus:outline-none focus:border-[#FFB800]/50" />
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <div className="text-xs text-[#8080A0] mb-1">Salida</div>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-              className="w-full bg-[#0E0E16] border border-[#23232F] rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none" />
-          </div>
-          <div className="flex-1">
-            <div className="text-xs text-[#8080A0] mb-1">Regreso</div>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-              className="w-full bg-[#0E0E16] border border-[#23232F] rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none" />
-          </div>
-        </div>
-        <button onClick={save} disabled={!name.trim() || !startDate || !endDate || saving}
-          className="w-full py-3 rounded-xl bg-[#FFB800] hover:bg-[#E6A600] disabled:opacity-50 text-black text-sm font-bold transition-all">
-          {saving ? 'Guardando...' : 'Guardar viaje'}
-        </button>
-      </motion.div>
-    </>
+    <div style={{ textAlign: 'center', padding: '36px 32px', fontSize: 13, color: '#ADA293' }}>
+      Crea una rutina para que Sheriff cambie de modo automáticamente.
+    </div>
+  )
+}
+
+function LoadingSkeleton() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="anim-shimmer" style={{ height: 110, borderRadius: 18 }} />
+      ))}
+    </div>
   )
 }
